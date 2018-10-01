@@ -62,6 +62,7 @@ func main() {
 }
 */
 
+
 func main() {
 	l, err := net.ListenUnix("unix",  &net.UnixAddr{"/tmp/go.sock", "unix"})
 	if err != nil {
@@ -97,3 +98,35 @@ func main() {
 
 	conn.Close()
 }
+
+/*
+func main() {
+	//connectionCreation:
+	conn, err := net.ListenUnixgram("unixgram",  &net.UnixAddr{"/tmp/unixdomain", "unixgram"})
+	if err != nil {
+		panic(err)
+	}
+	defer os.Remove("/tmp/go.sock")
+
+
+	//connectionCreation:
+	//
+	//conn, err := l.AcceptUnix()
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	for {
+		var buf [4096]byte
+		n, err := conn.Read(buf[:])
+		if err != nil {
+			fmt.Println("Error in reading data:", err)
+			//conn.Close()
+			//goto connectionCreation
+			//panic(err)
+		}
+		fmt.Printf("%s\n", string(buf[:n]));
+	}
+
+	conn.Close()
+}*/
