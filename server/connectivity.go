@@ -10,7 +10,7 @@ import (
 
 func echoServer(c net.Conn) {
 	for {
-		buf := make([]byte, 4096)
+		buf := make([]byte, 65536)
 		nr, err := c.Read(buf)
 		if err != nil {
 			return
