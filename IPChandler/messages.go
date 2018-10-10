@@ -5,32 +5,32 @@ type BoundingBox struct {
 }
 
 // more than ust a single prediction... right?
-type SimpleMessage struct {
-	RoundID int
+type PredictionMessage struct {
+	RoundID uint64
 	DetectionClass uint64
 	DetectionScore float32
 	DetectionBox BoundingBox
 }
 
 type StartMessage struct {
-	RoundID int
+	RoundID uint64
 }
 
 type EndMessage struct {
-	RoundID int
+	RoundID uint64
 }
 
 type StatusMessage struct {
-	RoundID int
+	RoundID uint64
 }
 
 type Status struct {
-	CurrentRound int
+	CurrentRound uint64
 	CurrentState State
 }
 
 type Packet struct {
-	Message *SimpleMessage
+	Message *PredictionMessage
 	Start *StartMessage
 	End *EndMessage
 	Status *Status

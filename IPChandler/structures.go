@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-type State int
+type State int32
 
 const (
 	Start = iota+1
