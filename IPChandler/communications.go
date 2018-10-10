@@ -14,7 +14,7 @@ func (node *Node) handleIncomingMessages() {
 	for {
 		packet := &Packet{}
 		n, senderAddress, err := node.Connection.ReadFromUDP(udpBuffer)
-		fmt.Println("read bytes: ", n)
+		fmt.Println("read bytes: ", n, "from ", senderAddress)
 		protobuf.Decode(udpBuffer, packet)
 		fmt.Println("new message received: ", packet)
 
