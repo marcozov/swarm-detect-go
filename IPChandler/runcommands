@@ -1,0 +1,3 @@
+./IPChandler -name=nodeA -address=127.0.0.1:5001 -peers=127.0.0.1:5002,127.0.0.1:5003
+./IPChandler -name=nodeB -address=127.0.0.1:5002 -peers=127.0.0.1:5001,127.0.0.1:5003
+./IPChandler -name=nodeC -address=127.0.0.1:5003 -peers=127.0.0.1:5001,127.0.0.1:5002

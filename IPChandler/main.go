@@ -4,6 +4,9 @@ import (
 	"net"
 	"os"
 	"fmt"
+	"flag"
+	"strings"
+	"time"
 )
 
 /*
@@ -59,7 +62,7 @@ func main() {
 }
 */
 
-var socketPath = "/tmp/go.sock"
+//var socketPath = "/tmp/go.sock"
 
 func removeSocket(socketPath string) {
 	err := os.Remove(socketPath)
@@ -68,21 +71,52 @@ func removeSocket(socketPath string) {
 	}
 }
 
-// The hosts in the network are assumed to be known: static configuration
-
+// For now, the hosts in the network are assumed to be known: static configuration
 func main() {
+	address := flag.String("address", "127.0.0.1:5000", "ip:port for the node")
+	name := flag.String("name", "", "name of the node")
+	peers := flag.String("peers", "", "comma separated list of peers of the form ip:port")
+
+	flag.Parse()
+
+	completeSocketPath := "/tmp/go" + strings.Split(*address, ":")[1] + ".sock"
+
 	// the UDP channel could be probably be opened at the beginning
 	// One is going to be ok! It can be used for sending and receiving data
+	fmt.Println(*address)
+	fmt.Println(*name)
+	fmt.Println(*peers)
 
-	if _, err := os.Stat(socketPath); os.IsExist(err) {
-		removeSocket(socketPath)
+	node := NewNode(*address, *name, *peers)
+
+	startMessagesChannel := make(chan *Packet)
+	statusMessagesChannel := make(chan *Packet)
+
+	node.StartHandler = startMessagesChannel
+	node.StatusHandler = statusMessagesChannel
+	node.RemainingPeers = node.InitPeersMap()
+
+	go func() {
+		time.Sleep(10*time.Second)
+		node.CurrentStatus.CurrentState = Finish
+	} ()
+
+	go node.propagateStartMessage(startMessagesChannel)
+	go node.propagateStatusMessage(statusMessagesChannel)
+
+	//go node.statusDebug()
+	go node.triggerPropagators()
+	go node.handleIncomingMessages()
+
+	if _, err := os.Stat(completeSocketPath); os.IsExist(err) {
+		removeSocket(completeSocketPath)
 	}
 
-	l, err := net.ListenUnix("unix",  &net.UnixAddr{socketPath, "unix"})
+	l, err := net.ListenUnix("unix",  &net.UnixAddr{completeSocketPath, "unix"})
 	if err != nil {
 		panic(fmt.Sprintf("Error in opening UNIX socket listener: %s\n", err))
 	}
-	defer removeSocket(socketPath)
+	defer removeSocket(completeSocketPath)
 
 	// retrieving data from the Python sockets: should this be run in parallel as a goroutine?
 	for {
