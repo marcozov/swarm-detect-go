@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/dedis/protobuf"
+	//"github.com/dedis/protobuf"
 	"fmt"
 	"net"
 	"time"
 	"math/rand"
+	"github.com/dedis/protobuf"
 )
 
 func (node *Node) handleIncomingMessages() {
@@ -16,11 +17,16 @@ func (node *Node) handleIncomingMessages() {
 		n, senderAddress, err := node.Connection.ReadFromUDP(udpBuffer)
 		fmt.Println("read bytes: ", n, "from ", senderAddress)
 		fmt.Println("encoded (receiving) packet: ", udpBuffer)
-		protobuf.Decode(udpBuffer, packet)
-		fmt.Println("new message received: ", packet)
 
 		if err != nil {
 			fmt.Printf("error in reading UDP data: %s\n", err)
+		}
+
+		err = protobuf.Decode(udpBuffer, packet)
+		fmt.Println("new message received: ", packet)
+
+		if err != nil {
+			fmt.Printf("error in decoding UDP data: %s\n", err)
 		}
 
 		if packet.Start != nil {
