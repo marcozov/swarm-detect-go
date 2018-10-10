@@ -117,6 +117,7 @@ func (node *Node) propagateStatusMessage(channel chan *Packet) {
 }
 
 func (node *Node) HandleStatusMessage(packet *Packet, senderAddress net.UDPAddr) {
+	fmt.Println("Handling incoming status message..")
 
 	if node.CurrentStatus.CurrentRound == packet.Status.CurrentRound && packet.Status.CurrentState == Finish {
 		if node.GetPeer(senderAddress) != nil {
