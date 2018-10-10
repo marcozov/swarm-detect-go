@@ -15,6 +15,7 @@ func (node *Node) handleIncomingMessages() {
 		packet := &Packet{}
 		n, senderAddress, err := node.Connection.ReadFromUDP(udpBuffer)
 		fmt.Println("read bytes: ", n, "from ", senderAddress)
+		fmt.Println("encoded (receiving) packet: ", udpBuffer)
 		protobuf.Decode(udpBuffer, packet)
 		fmt.Println("new message received: ", packet)
 
@@ -145,6 +146,7 @@ func (node *Node) sendToPeer(packet *Packet, peer Peer) {
 		panic(fmt.Sprintf("Error in encoding the message: %s", err))
 	}
 
+	fmt.Println("encoded sending packet: ", packetBytes)
 	n, err := node.Connection.WriteToUDP(packetBytes, peer.peerAddress)
 	fmt.Println("sent bytes: ", n)
 
