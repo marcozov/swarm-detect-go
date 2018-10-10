@@ -9,11 +9,13 @@ import (
 )
 
 func (node *Node) handleIncomingMessages() {
+	fmt.Println("enter message handler..")
 	udpBuffer := make([]byte, 4096)
 	for {
 		packet := &Packet{}
 		_, senderAddress, err := node.Connection.ReadFromUDP(udpBuffer)
 		protobuf.Decode(udpBuffer, packet)
+		fmt.Println("new message received: ", packet)
 
 		if err != nil {
 			fmt.Printf("error in reading UDP data: %s\n", err)
