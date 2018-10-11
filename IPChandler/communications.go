@@ -158,7 +158,7 @@ func (node *Node) propagateStartMessage(channel chan *Packet) {
 func (node *Node) propagateStatusMessage(channel chan *Packet) {
 	for {
 		status := <-channel
-		fmt.Printf("STATUS message to send to everyone: %s\n", status)
+		fmt.Printf("STATUS message to send to everyone: %s. Remaining peers: %s\n", status, node.RemainingPeers)
 
 		node.sendToPeers(status, node.RemainingPeers.v)
 	}

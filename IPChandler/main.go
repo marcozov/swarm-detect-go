@@ -12,7 +12,9 @@ import (
 /*
 func echoServer(c net.Conn) {
 	for {
-		fmt.Println("reading...")
+		fmt.Println("readinHi Marco Zoveralli,
+
+We appreciate your interest in Nestlé. Wg...")
 		buf := make([]byte, 4096)
 		nr, err := c.Read(buf)
 		fmt.Println("READ! **********")
@@ -129,7 +131,7 @@ func main() {
 			var buf [4096]byte
 			n, err := conn.Read(buf[:])
 			if err != nil {
-				fmt.Println("Error in reading data: %s\n", err)
+				fmt.Printf("Error in reading data: %s\n", err)
 				conn.Close()
 				//goto connectionCreation
 				break
