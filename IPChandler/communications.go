@@ -28,7 +28,7 @@ func (node *Node) handleIncomingMessages() {
 			panic(fmt.Sprintf("error in decoding UDP data: %s\n", err))
 		}
 		fmt.Println("new message received: ", packet)
-		
+
 		if packet.Start != nil {
 			node.HandleStartMessage(packet, *senderAddress)
 		} else if packet.Status != nil {
