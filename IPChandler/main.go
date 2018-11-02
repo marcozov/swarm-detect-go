@@ -6,65 +6,8 @@ import (
 	"fmt"
 	"flag"
 	"strings"
-	"time"
+	//"time"
 )
-
-/*
-func echoServer(c net.Conn) {
-	for {
-		fmt.Println("readinHi Marco Zoveralli,
-
-We appreciate your interest in Nestlé. Wg...")
-		buf := make([]byte, 4096)
-		nr, err := c.Read(buf)
-		fmt.Println("READ! **********")
-		if err != nil {
-			fmt.Sprintf("Error: %s\n", err)
-			return
-		}
-
-		data := buf[0:nr]
-		println("Server got:", string(data))
-		_, err = c.Write(data)
-		if err != nil {
-			fmt.Sprintf("Error: %s\n", err)
-			log.Fatal("Writing client error: ", err)
-		}
-
-		fmt.Println("after IPChandler got")
-	}
-}
-
-func main() {
-	log.Println("Starting echo IPChandler")
-	ln, err := net.Listen("unix", "/tmp/go.sock")
-	if err != nil {
-		log.Fatal("Listen error: ", err)
-	}
-
-	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
-	go func(ln net.Listener, c chan os.Signal) {
-		sig := <-c
-		log.Printf("Caught signal %s: shutting down.", sig)
-		ln.Close()
-		os.Exit(0)
-	}(ln, sigc)
-
-	for {
-		fmt.Println("main method")
-		fd, err := ln.Accept()
-		if err != nil {
-			fmt.Println("accept error: ", err)
-			log.Fatal("Accept error: ", err)
-		}
-
-		go echoServer(fd)
-	}
-}
-*/
-
-//var socketPath = "/tmp/go.sock"
 
 func removeSocket(socketPath string) {
 	err := os.Remove(socketPath)
@@ -75,10 +18,19 @@ func removeSocket(socketPath string) {
 
 // For now, the hosts in the network are assumed to be known: static configuration
 func main() {
+	fmt.Println("start: ", Start)
+	fmt.Println("finish: ", Finish)
 	address := flag.String("address", "127.0.0.1:5000", "ip:port for the node")
 	name := flag.String("name", "", "name of the node")
 	peers := flag.String("peers", "", "comma separated list of peers of the form ip:port")
+	leaderDummy := flag.String("leader", "", "ip:port for the leader")
 
+	detectionClass := flag.String("class", "person", "define the object to detect")
+	classesMapping := map[string]int{
+		"person": 1,
+	}
+
+	fmt.Println("class: ", classesMapping[*detectionClass])
 	flag.Parse()
 
 	completeSocketPath := "/tmp/go" + strings.Split(*address, ":")[1] + ".sock"
@@ -89,25 +41,49 @@ func main() {
 	fmt.Println(*name)
 	fmt.Println(*peers)
 
-	node := NewNode(*address, *name, *peers)
+	node := NewNode(*address, *name, *peers, classesMapping[*detectionClass])
+
+	// dummy leader init: assuming that it is fixed for now
+	if leader, exists := node.Peers[*leaderDummy]; exists {
+		node.Leader = leader
+	} else if node.Address.String() == *leaderDummy{
+		node.Leader = Peer{ peerAddress:node.Address }
+	}
 
 	startMessagesChannel := make(chan *Packet)
 	statusMessagesChannel := make(chan *Packet)
+	localPredictionsChannel := make(chan []byte)
+	externalPredictionsChannel := make(chan SinglePredictionWithSender)
+	endRoundMessagesChannel := make(chan *Packet)
 
 	node.StartHandler = startMessagesChannel
 	node.StatusHandler = statusMessagesChannel
+	node.ExternalPredictionsHandler = externalPredictionsChannel
+	node.EndRoundMessageHandler = endRoundMessagesChannel
 	node.RemainingPeers = node.InitPeersMap()
 
-	go func() {
-		time.Sleep(10*time.Second)
-		node.CurrentStatus.CurrentState = Finish
-	} ()
+	go node.opinionVectorDEBUG()
+
+	//go func() {
+	//	time.Sleep(10*time.Second)
+	//	node.CurrentStatus.StatusValue.CurrentState = Finish
+	//} ()
+
+	//node.startRound(1)
+	go node.HandleRounds()
+
+	//go node.
 
 	go node.propagateStartMessage(startMessagesChannel)
 	go node.propagateStatusMessage(statusMessagesChannel)
+	go node.HandleLocalPrediction(localPredictionsChannel)
+	go node.updateExternalPredictions(externalPredictionsChannel)
+	go node.PropagateLocalPredictions()
+	go node.PropagateEndRoundMessage(endRoundMessagesChannel)
+	go node.TriggerEndRoundMessagePropagation()
 
 	//go node.statusDebug()
-	go node.triggerPropagators()
+	//go node.triggerPropagators()
 	go node.handleIncomingMessages()
 
 	if _, err := os.Stat(completeSocketPath); os.IsExist(err) {
@@ -128,6 +104,8 @@ func main() {
 		}
 
 		for {
+			// any huge amount of data read at this point is coming from a socket..
+			// no bandwidth is used
 			var buf [4096]byte
 			n, err := conn.Read(buf[:])
 			if err != nil {
@@ -146,7 +124,8 @@ func main() {
 			// in any case, data should be propagated to other hosts in this phase..
 
 
-			fmt.Printf("IPC handler got: %s\n(%d bytes)", string(buf[:n]), n);
+			//fmt.Printf("IPC handler got: %s\n(%d bytes)", string(buf[:n]), n);
+			localPredictionsChannel <- buf[:n]
 		}
 
 		conn.Close()

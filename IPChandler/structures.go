@@ -15,16 +15,41 @@ const (
 	Finish
 )
 
+const DetectionClasses int = 91
+
 type Node struct {
 	Address    *net.UDPAddr // peerAddress on which peers send messages
 	Connection *net.UDPConn // to receive data from peers and to send data
 	Name       string       // name of the gossiper
-	Peers      map[string]Peer
-	RemainingPeers *SafeMap
-	//AcknowledgedPeers *SafeMap
-	CurrentStatus *Status
+	Peers      map[string]Peer // set of known peers
+	RemainingPeers *SafeMap    // set of peers from which the host needs the prediction (for the current round)
+	Leader Peer
+	//CurrentStatus *Status
+	CurrentStatus *StatusConcurrent
 	StartHandler chan *Packet
 	StatusHandler chan *Packet
+	EndRoundMessageHandler chan *Packet
+	LocalDecision LocalOpinionVector // accumulator of the local predictions
+	ReceivedLocalPredictions int
+	ExternalPredictions map[string]SinglePredictionWithSender
+	ExternalPredictionsHandler chan SinglePredictionWithSender
+	DetectionClass int // the object that we are trying to detect
+}
+
+type SinglePrediction struct {
+	Value []float64
+}
+
+type SinglePredictionWithSender struct {
+	Prediction SinglePrediction
+	Sender string
+}
+
+type LocalOpinionVector struct {
+	alpha float64
+	scores [DetectionClasses]float64
+	boundingBoxCoefficients [DetectionClasses]float64
+	mux sync.Mutex
 }
 
 type Peer struct {
@@ -36,24 +61,11 @@ type SafeMap struct {
 	mux sync.Mutex
 }
 
-func (node *Node) InitPeersMap() *SafeMap {
-	peers := &SafeMap{
-		v: make(map[string]Peer),
-	}
+func (node *Node) updateOpinionValue(class uint64, coefficient, score float64) {
+	node.LocalDecision.mux.Lock()
+	defer node.LocalDecision.mux.Unlock()
 
-	for key, value := range node.Peers {
-		peers.v[key] = value
-	}
-
-	return peers
-}
-
-func (node *Node) GetPeer(peer net.UDPAddr) *Peer {
-	if val, ok := node.Peers[peer.String()]; ok {
-		return &val
-	}
-
-	return nil
+	node.LocalDecision.scores[class] = node.LocalDecision.scores[class]*(1-coefficient) + score*coefficient
 }
 
 //func (node *Node) AddAcknowledgedPeer(peer Peer) {
@@ -64,10 +76,6 @@ func (node *Node) GetPeer(peer net.UDPAddr) *Peer {
 //	return node.AcknowledgedPeers.getPeer(peerAddress)
 //}
 
-func (node *Node) RemoveRemainingPeer(peer net.UDPAddr) {
-	node.RemainingPeers.removePeer(peer)
-}
-
 func (m *SafeMap) Length() int {
 	m.mux.Lock()
 	defer m.mux.Unlock()
@@ -75,32 +83,7 @@ func (m *SafeMap) Length() int {
 	return len(m.v)
 }
 
-func (m *SafeMap) addPeer(peer Peer) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	m.v[peer.peerAddress.String()] = peer
-}
-
-func (m *SafeMap) removePeer(peer net.UDPAddr) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	delete(m.v, peer.String())
-}
-
-func (m *SafeMap) getPeer(peer net.UDPAddr) *Peer {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	if val, ok := m.v[peer.String()]; ok {
-		return &val
-	}
-
-	return nil
-}
-
-func NewNode(address, name, peers string) *Node {
+func NewNode(address, name, peers string, detectionClass int) *Node {
 	udpAddress, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
 		panic (fmt.Sprintf("Address not valid: %s", err))
@@ -117,34 +100,60 @@ func NewNode(address, name, peers string) *Node {
 		Connection: udpConnection,
 		Name:       name,
 		Peers:      myPeers,
-		CurrentStatus: &Status{
-			CurrentRound: 1,
-			CurrentState: Start,
+		CurrentStatus:
+			&StatusConcurrent{
+				StatusValue: Status{
+					CurrentRound: 1,
+					CurrentState: Start,
+					CurrentPrediction: SinglePrediction{ Value: []float64{0, 0}},
+				},
+			},
+		LocalDecision: LocalOpinionVector{
+			alpha: 0.5,
+			scores: [DetectionClasses]float64{},
+			boundingBoxCoefficients: [DetectionClasses]float64{},
 		},
+
+		ReceivedLocalPredictions: 0,
+		ExternalPredictions: make(map[string]SinglePredictionWithSender),
+		DetectionClass: detectionClass,
 	}
 
 	for _, peer := range strings.Split(peers, ",") {
-		node.addPeer(peer)
+		//node.addPeer(peer)
+		myPeers := node.Peers
+
+		peerAddress, err := net.ResolveUDPAddr("udp4", peer)
+		if err != nil {
+			panic(fmt.Sprintf("Error in parsing the UDP peerAddress: %s", err))
+		}
+
+		peerWrapper := Peer {
+			peerAddress: peerAddress,
+		}
+
+		myPeers[peerAddress.String()] = peerWrapper
+		node.Peers = myPeers
 	}
 
 	return node
 }
 
-func (node *Node) addPeer(peer string) {
-	myPeers := node.Peers
-
-	peerAddress, err := net.ResolveUDPAddr("udp4", peer)
-	if err != nil {
-		panic(fmt.Sprintf("Error in parsing the UDP peerAddress: %s", err))
-	}
-
-	peerWrapper := Peer {
-		peerAddress: peerAddress,
-	}
-
-	myPeers[peerAddress.String()] = peerWrapper
-	node.Peers = myPeers
-}
+//func (node *Node) addPeer(peer string) {
+//	myPeers := node.Peers
+//
+//	peerAddress, err := net.ResolveUDPAddr("udp4", peer)
+//	if err != nil {
+//		panic(fmt.Sprintf("Error in parsing the UDP peerAddress: %s", err))
+//	}
+//
+//	peerWrapper := Peer {
+//		peerAddress: peerAddress,
+//	}
+//
+//	myPeers[peerAddress.String()] = peerWrapper
+//	node.Peers = myPeers
+//}
 
 func (node *Node) statusDebug() {
 	for {
@@ -154,5 +163,36 @@ func (node *Node) statusDebug() {
 }
 
 func (status *Status) String() string {
-	return fmt.Sprintf("Current round: %d, state of the round: %s", status.CurrentRound, status.CurrentState)
+	return fmt.Sprintf("Current round: %d, state of the round: %s, current prediction: %s", status.CurrentRound, status.CurrentState, status.CurrentPrediction)
+}
+
+func entropy(scores []float32) float32 {
+	return 0
+}
+
+
+// helper functions for the SafeMap type
+func (m *SafeMap) removePeer(peer net.UDPAddr) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	delete(m.v, peer.String())
+}
+
+func (m *SafeMap) addPeer(peer Peer) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	m.v[peer.peerAddress.String()] = peer
+}
+
+func (m *SafeMap) getPeer(peer net.UDPAddr) *Peer {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	if val, ok := m.v[peer.String()]; ok {
+		return &val
+	}
+
+	return nil
 }

@@ -1,37 +1,42 @@
 package main
 
+import "sync"
+
 type BoundingBox struct {
-	// TODO: define the structure
+	Coefficient float32
 }
 
-// more than ust a single prediction... right?
+// there is probably no need to send information about other classes
 type PredictionMessage struct {
 	RoundID uint64
 	DetectionClass uint64
-	DetectionScore float32
+	DetectionScore float64
 	DetectionBox BoundingBox
+	Entropy float32
 }
 
 type StartMessage struct {
 	RoundID uint64
 }
 
-type EndMessage struct {
+type EndRoundMessage struct {
 	RoundID uint64
 }
 
-type StatusMessage struct {
-	RoundID uint64
+type StatusConcurrent struct {
+	StatusValue Status
+	mux sync.Mutex
 }
 
 type Status struct {
 	CurrentRound uint64
 	CurrentState State
+	CurrentPrediction SinglePrediction
 }
 
 type Packet struct {
-	Message *PredictionMessage
-	Start *StartMessage
-	End *EndMessage
-	Status *Status
+	Prediction *PredictionMessage
+	Start      *StartMessage
+	End        *EndRoundMessage
+	Status     *Status
 }
