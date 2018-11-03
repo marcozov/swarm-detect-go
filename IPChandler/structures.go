@@ -11,18 +11,19 @@ import (
 type State int32
 
 const (
-	Start = iota+1
-	Finish
+	WaitingForLocalPredictions  = iota+1
+	LocalPredictionsTerminated
+	FinalPredictionTerminated
 )
 
 const DetectionClasses int = 91
 
 type Node struct {
-	Address    *net.UDPAddr // peerAddress on which peers send messages
-	Connection *net.UDPConn // to receive data from peers and to send data
-	Name       string       // name of the gossiper
-	Peers      map[string]Peer // set of known peers
-	RemainingPeers *SafeMap    // set of peers from which the host needs the prediction (for the current round)
+	Address    *net.UDPAddr      // peerAddress on which peers send messages
+	Connection *net.UDPConn      // to receive data from peers and to send data
+	Name       string            // name of the gossiper
+	Peers      map[string]Peer   // set of known peers
+	RemainingPeers *SafeMapPeers // set of peers from which the host needs the prediction (for the current round)
 	Leader Peer
 	//CurrentStatus *Status
 	CurrentStatus *StatusConcurrent
@@ -31,8 +32,12 @@ type Node struct {
 	EndRoundMessageHandler chan *Packet
 	LocalDecision LocalOpinionVector // accumulator of the local predictions
 	ReceivedLocalPredictions int
-	ExternalPredictions map[string]SinglePredictionWithSender
-	ExternalPredictionsHandler chan SinglePredictionWithSender
+	//ExternalPredictions map[string]SinglePredictionWithSender
+	ExternalPredictions *SafeMapSinglePredictions
+	//ExternalPredictionsHandler chan SinglePredictionWithSender
+	ExternalPredictionsHandler chan *Packet
+	PredictionsAggregatorHandler chan struct{}
+	EndRoundHandler chan struct{}
 	DetectionClass int // the object that we are trying to detect
 }
 
@@ -56,11 +61,6 @@ type Peer struct {
 	peerAddress    *net.UDPAddr
 }
 
-type SafeMap struct {
-	v   map[string]Peer
-	mux sync.Mutex
-}
-
 func (node *Node) updateOpinionValue(class uint64, coefficient, score float64) {
 	node.LocalDecision.mux.Lock()
 	defer node.LocalDecision.mux.Unlock()
@@ -75,13 +75,6 @@ func (node *Node) updateOpinionValue(class uint64, coefficient, score float64) {
 //func (node *Node) GetAcknowledgedPeer(peerAddress net.UDPAddr) *Peer {
 //	return node.AcknowledgedPeers.getPeer(peerAddress)
 //}
-
-func (m *SafeMap) Length() int {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	return len(m.v)
-}
 
 func NewNode(address, name, peers string, detectionClass int) *Node {
 	udpAddress, err := net.ResolveUDPAddr("udp4", address)
@@ -103,8 +96,8 @@ func NewNode(address, name, peers string, detectionClass int) *Node {
 		CurrentStatus:
 			&StatusConcurrent{
 				StatusValue: Status{
-					CurrentRound: 1,
-					CurrentState: Start,
+					CurrentRound:      1,
+					CurrentState:      WaitingForLocalPredictions,
 					CurrentPrediction: SinglePrediction{ Value: []float64{0, 0}},
 				},
 			},
@@ -115,9 +108,10 @@ func NewNode(address, name, peers string, detectionClass int) *Node {
 		},
 
 		ReceivedLocalPredictions: 0,
-		ExternalPredictions: make(map[string]SinglePredictionWithSender),
+		//ExternalPredictions: make(map[string]SinglePredictionWithSender),
 		DetectionClass: detectionClass,
 	}
+
 
 	for _, peer := range strings.Split(peers, ",") {
 		//node.addPeer(peer)
@@ -136,7 +130,14 @@ func NewNode(address, name, peers string, detectionClass int) *Node {
 		node.Peers = myPeers
 	}
 
+	node.RemainingPeers = node.InitPeersMap()
+	node.ExternalPredictions = node.InitExternalPredictionsMap()
+
 	return node
+}
+
+func (node *Node) isLeader() bool {
+	return node.Address.String() == node.Leader.peerAddress.String()
 }
 
 //func (node *Node) addPeer(peer string) {
@@ -168,31 +169,4 @@ func (status *Status) String() string {
 
 func entropy(scores []float32) float32 {
 	return 0
-}
-
-
-// helper functions for the SafeMap type
-func (m *SafeMap) removePeer(peer net.UDPAddr) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	delete(m.v, peer.String())
-}
-
-func (m *SafeMap) addPeer(peer Peer) {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	m.v[peer.peerAddress.String()] = peer
-}
-
-func (m *SafeMap) getPeer(peer net.UDPAddr) *Peer {
-	m.mux.Lock()
-	defer m.mux.Unlock()
-
-	if val, ok := m.v[peer.String()]; ok {
-		return &val
-	}
-
-	return nil
 }

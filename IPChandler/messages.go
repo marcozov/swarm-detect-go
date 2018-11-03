@@ -1,6 +1,9 @@
 package main
 
-import "sync"
+import (
+	"sync"
+	"net"
+)
 
 type BoundingBox struct {
 	Coefficient float32
@@ -23,6 +26,10 @@ type EndRoundMessage struct {
 	RoundID uint64
 }
 
+type ProbeMessage struct {
+	RoundID uint64
+}
+
 type StatusConcurrent struct {
 	StatusValue Status
 	mux sync.Mutex
@@ -34,9 +41,23 @@ type Status struct {
 	CurrentPrediction SinglePrediction
 }
 
+type AcknowledgementMessage struct {
+	ID uint64
+}
+
+type FinalPredictionMessage struct {
+	ID uint64
+	Prediction *SinglePrediction
+}
+
 type Packet struct {
-	Prediction *PredictionMessage
-	Start      *StartMessage
-	End        *EndRoundMessage
-	Status     *Status
+	//FinalPrediction *PredictionMessage
+	//FinalPrediction *SinglePrediction
+	FinalPrediction *FinalPredictionMessage
+	Start           *StartMessage
+	End             *EndRoundMessage
+	Status          *Status
+	Probe 			*ProbeMessage
+	Ack 			*AcknowledgementMessage
+	SenderAddress	*net.UDPAddr
 }

@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"net"
-	"time"
 )
 
+/*
 // handling round advancement
 func (node *Node) HandleRounds() {
 	ticker := time.NewTicker(1*time.Second)
@@ -14,13 +14,14 @@ func (node *Node) HandleRounds() {
 	for {
 		select {
 		case _ = <- ticker.C:
-			if node.CurrentStatus.StatusValue.CurrentState == Finish && node.RemainingPeers.Length() == 0 {
+			if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated && node.RemainingPeers.Length() == 0 {
 				//node.startRound(1)
 				node.startNewRound()
 			}
 		}
 	}
 }
+*/
 
 // need to make sure that this is really called only once: what about locking the status or the round?
 //func (node *Node) startRound(newRound uint64) {
@@ -36,40 +37,23 @@ func (node *Node) startNewRound() {
 	//node.CurrentStatus.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
 	node.ReceivedLocalPredictions = 0
 	node.CurrentStatus.StatusValue.CurrentRound = newRound
-	node.CurrentStatus.StatusValue.CurrentState = Start
+	node.CurrentStatus.StatusValue.CurrentState = WaitingForLocalPredictions
 
-	node.ExternalPredictions = make(map[string]SinglePredictionWithSender)
+	//node.ExternalPredictions = make(map[string]SinglePredictionWithSender)
 	//}
 
 	// re-initialize the set of peers that should send me the prediction in the current round
 	node.RemainingPeers = node.InitPeersMap()
-}
-
-
-
-// sending the accumulated local prediction
-func (node *Node) PropagateLocalPredictions() {
-	ticker := time.NewTicker(1*time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case _ = <- ticker.C:
-			if node.CurrentStatus.StatusValue.CurrentState == Finish {
-				statusPacket := &Packet {
-					Status: &node.CurrentStatus.StatusValue,
-				}
-				node.StatusHandler <- statusPacket
-			}
-		}
-	}
+	node.ExternalPredictions = node.InitExternalPredictionsMap()
 }
 
 // wrapper function to handle status message
-func (node *Node) propagateStatusMessage(channel chan *Packet) {
+//func (node *Node) propagateStatusMessage(channel chan *Packet) {
+func (node *Node) propagateStatusMessage() {
 	for {
-		status := <- channel
-		//fmt.Printf("STATUS message to send to everyone: %s. Remaining peers: %s\n", status, node.RemainingPeers)
+		//status := <- channel
+		status := <- node.StatusHandler
+		fmt.Printf("STATUS message to send to everyone: %s. Remaining peers: %s\n", status, node.RemainingPeers)
 
 		node.sendToPeers(status, node.RemainingPeers.v)
 	}
@@ -77,49 +61,55 @@ func (node *Node) propagateStatusMessage(channel chan *Packet) {
 
 // wrapper function to handle external predictions
 // useful for concurrency issues
-func (node *Node) updateExternalPredictions(channel chan SinglePredictionWithSender) {
+//func (node *Node) updateExternalPredictions(channel chan SinglePredictionWithSender) {
+func (node *Node) updateExternalPredictions() {
 	for {
-		prediction := <- channel
-
-		//fmt.Println("prediction: ", prediction)
-		if _, ok := node.ExternalPredictions[prediction.Sender]; !ok {
-			fmt.Println("new prediction: ", prediction)
-			//fmt.Println("external predictions to consider in the final vote: ", node.ExternalPredictions)
-			node.ExternalPredictions[prediction.Sender] = prediction
+		//prediction := <- channel
+		//prediction := <- node.ExternalPredictionsHandler
+		predictionPacket := <- node.ExternalPredictionsHandler
+		prediction := predictionPacket.Status.CurrentPrediction
+		sender := predictionPacket.SenderAddress
+		fmt.Println("external prediction: ", prediction)
+		if node.isLeader() {
+			//fmt.Println("external prediction: ", prediction)
+			//if _, ok := node.ExternalPredictions[prediction.Sender]; !ok {
+			if existingPrediction := node.ExternalPredictions.getPrediction(sender.String()); existingPrediction == nil {
+				fmt.Println("new prediction: ", prediction)
+				//fmt.Println("external predictions to consider in the final vote: ", node.ExternalPredictions)
+				//node.ExternalPredictions[prediction.Sender] = prediction
+				node.ExternalPredictions.addPrediction(sender.String(), prediction)
+				// send signal to check that all external predictions have been received
+				node.PredictionsAggregatorHandler <- struct{}{}
+			}
 		}
 	}
 }
 
-func (node *Node) HandleStatusMessageReceive(packet *Packet, senderAddress net.UDPAddr) {
+func (node *Node) HandleReceivedStatus(packet *Packet, senderAddress net.UDPAddr) {
 	// is any lock needed in order to access the status?
-	//fmt.Println("Handling status message..")
+	fmt.Println("Handling status message..")
 	//fmt.Println("status prediction: ", packet.Status.CurrentPrediction)
+	if senderAddress.String() != node.Leader.peerAddress.String() {
 
-	//if node.CurrentStatus.CurrentRound == packet.Status.CurrentRound && packet.Status.CurrentState == Finish {
-	//fmt.Println("problem accessing the status?")
-	if node.CurrentStatus.StatusValue.CurrentRound == packet.Status.CurrentRound {
-		//fmt.Println("nop, I accessed")
-		if node.GetPeer(senderAddress) != nil {
-			//node.RemoveRemainingPeer(senderAddress)
+		//if node.CurrentStatus.CurrentRound == packet.Status.CurrentRound && packet.Status.CurrentState == LocalPredictionsTerminated {
+		//fmt.Println("problem accessing the status?")
+		if node.CurrentStatus.StatusValue.CurrentRound == packet.Status.CurrentRound {
+			//fmt.Println("nop, I accessed")
+			if node.GetPeer(senderAddress) != nil {
+				//node.RemoveRemainingPeer(senderAddress)
 
-			// aggregate the information
-			currentPrediction := packet.Status.CurrentPrediction
-			node.ExternalPredictionsHandler <- SinglePredictionWithSender{
-					Prediction: currentPrediction,
-					Sender: senderAddress.String(),
-				}
+				// aggregate the information
+				//currentPrediction := packet.Status.CurrentPrediction
+				//node.ExternalPredictionsHandler <- SinglePredictionWithSender{
+				//	Prediction: currentPrediction,
+				//	Sender:     senderAddress.String(),
+				//}
+				packet.SenderAddress = &senderAddress
+				node.ExternalPredictionsHandler <- packet
+			}
 		}
 	}
 	//fmt.Println("finished handling status message ..")
-}
-
-func (node *Node) HandleEndRoundMessageReceive(packet *Packet, senderAddress net.UDPAddr) {
-	myCurrentRond := node.CurrentStatus.StatusValue.CurrentRound
-	packetRoundID := packet.End.RoundID
-	fmt.Println("my current round: ", myCurrentRond, " packetRoundID: ", packetRoundID)
-	if myCurrentRond == packetRoundID {
-		node.RemoveRemainingPeer(senderAddress)
-	}
 }
 
 func (node *Node) updateOpinionVector(localPrediction map[int][]float64) {
@@ -140,3 +130,40 @@ func (node *Node) updateOpinionVector(localPrediction map[int][]float64) {
 		node.LocalDecision.scores[k] = alpha*v[0] + node.LocalDecision.scores[k]*(1-alpha)
 	}
 }
+
+/*
+// the end message will arrive from the leader
+func (node *Node) HandleReceivedEndRound(packet *Packet, senderAddress net.UDPAddr) {
+	if senderAddress.String() == node.Leader.peerAddress.String() {
+		myCurrentRond := node.CurrentStatus.StatusValue.CurrentRound
+		packetRoundID := packet.End.RoundID
+		fmt.Println("my current round: ", myCurrentRond, " packetRoundID: ", packetRoundID)
+		if myCurrentRond == packetRoundID {
+			node.RemoveRemainingPeer(senderAddress)
+		}
+	}
+}
+*/
+
+/*
+// sending the accumulated local prediction
+func (node *Node) PropagateLocalPredictions() {
+	ticker := time.NewTicker(1*time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case _ = <- ticker.C:
+			fmt.Println("current state: ", node.CurrentStatus.StatusValue.CurrentState, "leader: ", node.Leader.peerAddress.String(), " my address: ", node.Address.String())
+			if node.Leader.peerAddress.String() != node.Address.String() {
+				if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated {
+					statusPacket := &Packet{
+						Status: &node.CurrentStatus.StatusValue,
+					}
+					node.StatusHandler <- statusPacket
+				}
+			}
+		}
+	}
+}
+*/

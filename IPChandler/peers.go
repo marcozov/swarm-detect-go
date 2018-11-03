@@ -4,8 +4,8 @@ import (
 	"net"
 )
 
-func (node *Node) InitPeersMap() *SafeMap {
-	peers := &SafeMap{
+func (node *Node) InitPeersMap() *SafeMapPeers {
+	peers := &SafeMapPeers{
 		v: make(map[string]Peer),
 	}
 
@@ -18,6 +18,7 @@ func (node *Node) InitPeersMap() *SafeMap {
 	return peers
 }
 
+// TODO: check whether it is ok not to put concurrency here
 func (node *Node) GetPeer(peer net.UDPAddr) *Peer {
 	if val, ok := node.Peers[peer.String()]; ok {
 		return &val

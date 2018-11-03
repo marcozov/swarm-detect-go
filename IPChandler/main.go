@@ -18,8 +18,8 @@ func removeSocket(socketPath string) {
 
 // For now, the hosts in the network are assumed to be known: static configuration
 func main() {
-	fmt.Println("start: ", Start)
-	fmt.Println("finish: ", Finish)
+	fmt.Println("start: ", WaitingForLocalPredictions)
+	fmt.Println("finish: ", LocalPredictionsTerminated)
 	address := flag.String("address", "127.0.0.1:5000", "ip:port for the node")
 	name := flag.String("name", "", "name of the node")
 	peers := flag.String("peers", "", "comma separated list of peers of the form ip:port")
@@ -53,34 +53,45 @@ func main() {
 	startMessagesChannel := make(chan *Packet)
 	statusMessagesChannel := make(chan *Packet)
 	localPredictionsChannel := make(chan []byte)
-	externalPredictionsChannel := make(chan SinglePredictionWithSender)
+	//externalPredictionsChannel := make(chan SinglePredictionWithSender)
+	externalPredictionsChannel := make(chan *Packet)
 	endRoundMessagesChannel := make(chan *Packet)
+	predictionsAggregatorHandler := make(chan struct{})
+	endRoundHandler := make(chan struct{})
 
 	node.StartHandler = startMessagesChannel
 	node.StatusHandler = statusMessagesChannel
 	node.ExternalPredictionsHandler = externalPredictionsChannel
 	node.EndRoundMessageHandler = endRoundMessagesChannel
-	node.RemainingPeers = node.InitPeersMap()
+	node.PredictionsAggregatorHandler = predictionsAggregatorHandler
+	node.EndRoundHandler = endRoundHandler
 
 	go node.opinionVectorDEBUG()
 
 	//go func() {
 	//	time.Sleep(10*time.Second)
-	//	node.CurrentStatus.StatusValue.CurrentState = Finish
+	//	node.CurrentStatus.StatusValue.CurrentState = LocalPredictionsTerminated
 	//} ()
 
 	//node.startRound(1)
-	go node.HandleRounds()
+	//go node.HandleRounds()
+	go node.periodicPeersProbe()
 
 	//go node.
+	go node.AggregateAllPredictions()
 
-	go node.propagateStartMessage(startMessagesChannel)
-	go node.propagateStatusMessage(statusMessagesChannel)
+	//go node.propagateStartMessage(startMessagesChannel)
+
+	//go node.propagateStatusMessage(statusMessagesChannel)
+	go node.propagateStatusMessage()
+	//go node.PropagateLocalPredictions()
+
 	go node.HandleLocalPrediction(localPredictionsChannel)
-	go node.updateExternalPredictions(externalPredictionsChannel)
-	go node.PropagateLocalPredictions()
-	go node.PropagateEndRoundMessage(endRoundMessagesChannel)
-	go node.TriggerEndRoundMessagePropagation()
+	//go node.updateExternalPredictions(externalPredictionsChannel)
+	go node.updateExternalPredictions()
+
+	//go node.PropagateEndRoundMessage(endRoundMessagesChannel)
+	//go node.TriggerEndRoundMessagePropagation()
 
 	//go node.statusDebug()
 	//go node.triggerPropagators()

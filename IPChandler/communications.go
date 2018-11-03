@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"time"
 	//"math/rand"
 	"github.com/dedis/protobuf"
@@ -13,7 +12,7 @@ import (
 // concurrency is handled by design (theoretically.. need to test)
 func (node *Node) HandleLocalPrediction(channel chan []byte) {
 	for {
-		jsonMessage := <-channel
+		jsonMessage := <- channel
 
 		// TODO: replace json with gRPC
 		//res := make(map[string][]float64)
@@ -32,11 +31,13 @@ func (node *Node) HandleLocalPrediction(channel chan []byte) {
 		if node.ReceivedLocalPredictions == 20 {
 			node.CurrentStatus.mux.Lock()
 
-			if node.CurrentStatus.StatusValue.CurrentState != Finish {
+			// probably no need to save the state, since it is sent only to one host (the leader)
+			if node.CurrentStatus.StatusValue.CurrentState == WaitingForLocalPredictions {
 				fmt.Println("I finished accumulating data for this round!")
 				node.CurrentStatus.StatusValue.CurrentPrediction.Value[0] = node.LocalDecision.scores[node.DetectionClass]
 				node.CurrentStatus.StatusValue.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
-				node.CurrentStatus.StatusValue.CurrentState = Finish
+				node.CurrentStatus.StatusValue.CurrentState = LocalPredictionsTerminated
+				node.PredictionsAggregatorHandler <- struct{}{}
 			}
 
 			node.ReceivedLocalPredictions = 0
@@ -66,61 +67,21 @@ func (node *Node) handleIncomingMessages() {
 		}
 		//fmt.Println("new message received: ", packet)
 
-		//if packet.Start != nil {
+		//if packet.WaitingForLocalPredictions != nil {
 		//	node.HandleStartMessage(packet, *senderAddress)
 		//} else
-		if packet.Status != nil {
-			node.HandleStatusMessageReceive(packet, *senderAddress)
-		} else if packet.Prediction != nil {
-			node.HandlePredictionMessage(packet, *senderAddress)
-		} else if packet.End != nil {
-			fmt.Println("*************** END ROUND MESSAGE ***************", packet.End, "sender: ", senderAddress)
-			node.HandleEndRoundMessageReceive(packet, *senderAddress)
-		}
-	}
-}
-
-func (node *Node) allExternalPredictionsObtained() bool {
-	for peer, _ := range node.Peers {
-		if _, exists := node.ExternalPredictions[peer]; !exists {
-			fmt.Println("the peer ", peer, " did not send the prediction")
-			return false
-		}
-	}
-
-	return true
-}
-
-func (node *Node) TriggerEndRoundMessagePropagation() {
-	ticker := time.NewTicker(1*time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case _ = <- ticker.C:
-			res := node.allExternalPredictionsObtained()
-			fmt.Println(" ************** result of the check: ", res)
-			if res && node.CurrentStatus.StatusValue.CurrentState == Finish {
-				fmt.Println("Preparing END message ..")
-				endPacket := &Packet {
-					End: &EndRoundMessage{
-						RoundID: node.CurrentStatus.StatusValue.CurrentRound,
-					},
-				}
-
-				fmt.Println(" ***** END message prepared: ", endPacket)
-				node.EndRoundMessageHandler <- endPacket
-			}
-		}
-	}
-}
-
-func (node *Node) PropagateEndRoundMessage(channel chan *Packet) {
-	for {
-		status := <- channel
-		fmt.Printf("END ROUND message to send to everyone: %s. Remaining peers: %s\n", status, node.RemainingPeers)
-
-		node.sendToPeers(status, node.RemainingPeers.v)
+		if packet.Probe != nil {
+			node.HandleReceivedProbe(packet, *senderAddress)
+		} else if packet.Status != nil {
+			node.HandleReceivedStatus(packet, *senderAddress)
+		} else if packet.FinalPrediction != nil {
+			node.HandleReceivedFinalPrediction(packet, *senderAddress)
+		} else if packet.Ack != nil {
+			node.HandleReceivedAcknowledgement(packet, *senderAddress)
+		} //else if packet.End != nil {
+		//	fmt.Println("*************** END ROUND MESSAGE ***************", packet.End, "sender: ", senderAddress)
+		//	node.HandleReceivedEndRound(packet, *senderAddress)
+		//}
 	}
 }
 
@@ -163,12 +124,32 @@ func (node *Node) opinionVectorDEBUG() {
 			//fmt.Println("Keyboard coefficient: ", node.LocalDecision.boundingBoxCoefficients[76])
 			fmt.Println("remaining neighbors: ", node.RemainingPeers)
 			fmt.Println("received external predictions: ", node.ExternalPredictions)
+			fmt.Println("current round: ", node.CurrentStatus.StatusValue.CurrentRound, " current status: ", node.CurrentStatus.StatusValue.CurrentState)
 			fmt.Println()
 		}
 	}
 }
 
 
+
+
+
+// alternative: if we want to remove locks for handling the remaining peers
+func (node *Node) removeRemainingPeer(channel chan struct{}) {
+
+}
+
+/*
+// can be triggered only if this host is the leader
+func (node *Node) PropagateEndRoundMessage(channel chan *Packet) {
+	for {
+		status := <- channel
+		fmt.Printf("END ROUND message to send to everyone: %s. Remaining peers: %s\n", status, node.RemainingPeers)
+
+		node.sendToPeers(status, node.RemainingPeers.v)
+	}
+}
+*/
 
 /*
 func (node *Node) triggerPropagators() {
@@ -179,14 +160,14 @@ func (node *Node) triggerPropagators() {
 		select {
 		case _ = <-ticker.C:
 			// if the computation is finished and all the peers finished too: send START
-			if node.CurrentStatus.StatusValue.CurrentState == Finish && node.RemainingPeers.Length() == 0 {
+			if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated && node.RemainingPeers.Length() == 0 {
 				// go to the following round
 				node.RemainingPeers = node.InitPeersMap()
 				node.CurrentStatus.StatusValue.CurrentRound++
-				node.CurrentStatus.StatusValue.CurrentState = Start
+				node.CurrentStatus.StatusValue.CurrentState = WaitingForLocalPredictions
 
 				toPropagate := &Packet {
-					Start: &StartMessage{
+					WaitingForLocalPredictions: &StartMessage{
 						RoundID: node.CurrentStatus.StatusValue.CurrentRound,
 					},
 				}
@@ -200,7 +181,7 @@ func (node *Node) triggerPropagators() {
 					n := time.Duration(rand.Intn(20))
 					//fmt.Printf("random wait: %d\n", n)
 					time.Sleep(n*time.Second)
-					node.CurrentStatus.StatusValue.CurrentState = Finish
+					node.CurrentStatus.StatusValue.CurrentState = LocalPredictionsTerminated
 					//fmt.Println("finished (from triggerPropagators)!")
 					fmt.Printf("DEBUG: %s %s\n", node.CurrentStatus, node.RemainingPeers)
 				} ()
@@ -215,20 +196,6 @@ func (node *Node) triggerPropagators() {
 		}
 	}
 }*/
-
-
-// update the moving average
-func (node *Node) HandlePredictionMessage(packet *Packet, senderAddress net.UDPAddr) {
-	externalPrediction := packet.Prediction
-
-	coefficient := computeCoefficient(externalPrediction.Entropy, externalPrediction.DetectionBox)
-	node.updateOpinionValue(externalPrediction.DetectionClass, coefficient, externalPrediction.DetectionScore)
-	//node.LocalDecision = coefficient*score
-
-	if node.GetPeer(senderAddress) != nil {
-		node.RemoveRemainingPeer(senderAddress)
-	}
-}
 
 func computeCoefficient(entropy float32, boundingBoxRatio BoundingBox) float64 {
 	return 0
@@ -250,14 +217,14 @@ func (node *Node) propagatePredictionMessage(channel chan *Packet) {
 /*
 func (node *Node) HandleStartMessage(packet *Packet, senderAddress net.UDPAddr) {
 	//fmt.Println("Handling incoming *START* message..")
-	//fmt.Println(packet.Start, packet.End, packet.Status)
-	if node.CurrentStatus.CurrentState == Finish && node.CurrentStatus.CurrentRound < packet.Start.RoundID {
+	//fmt.Println(packet.WaitingForLocalPredictions, packet.End, packet.Status)
+	if node.CurrentStatus.CurrentState == LocalPredictionsTerminated && node.CurrentStatus.CurrentRound < packet.WaitingForLocalPredictions.RoundID {
 		node.RemainingPeers = node.InitPeersMap()
-		node.CurrentStatus.CurrentRound = packet.Start.RoundID
-		node.CurrentStatus.CurrentState = Start
+		node.CurrentStatus.CurrentRound = packet.WaitingForLocalPredictions.RoundID
+		node.CurrentStatus.CurrentState = WaitingForLocalPredictions
 
 		toPropagate := &Packet {
-			Start: &StartMessage{
+			WaitingForLocalPredictions: &StartMessage{
 				RoundID: node.CurrentStatus.CurrentRound,
 			},
 		}
@@ -270,10 +237,38 @@ func (node *Node) HandleStartMessage(packet *Packet, senderAddress net.UDPAddr) 
 			n := time.Duration(rand.Intn(20))
 			//fmt.Printf("random wait: %d\n", n)
 			time.Sleep(n*time.Second)
-			node.CurrentStatus.CurrentState = Finish
+			node.CurrentStatus.CurrentState = LocalPredictionsTerminated
 			//fmt.Println("finished (from startHandler)!")
 			fmt.Printf("DEBUG: %s %s\n", node.CurrentStatus, node.RemainingPeers)
 		} ()
+	}
+}
+*/
+
+/*
+func (node *Node) TriggerEndRoundMessagePropagation() {
+	ticker := time.NewTicker(1*time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case _ = <- ticker.C:
+			if node.Leader.peerAddress == node.Address {
+				res := node.allExternalPredictionsObtained()
+				fmt.Println(" ************** result of the check: ", res)
+				if res && node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated {
+					fmt.Println("Preparing END message ..")
+					endPacket := &Packet{
+						End: &EndRoundMessage{
+							RoundID: node.CurrentStatus.StatusValue.CurrentRound,
+						},
+					}
+
+					fmt.Println(" ***** END message prepared: ", endPacket)
+					node.EndRoundMessageHandler <- endPacket
+				}
+			}
+		}
 	}
 }
 */
