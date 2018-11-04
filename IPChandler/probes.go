@@ -13,11 +13,13 @@ func (node *Node) HandleReceivedProbe(packet *Packet, senderAddress net.UDPAddr)
 		node.CurrentStatus.mux.Lock()
 		//newPrediction := []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]}
 
+		localScore, localBBcoefficient := node.LocalDecision.getOpinion(node.DetectionClass)
 		statusToSend := Status{
 			CurrentRound: node.CurrentStatus.StatusValue.CurrentRound,
 			CurrentState: node.CurrentStatus.StatusValue.CurrentState,
 			CurrentPrediction: SinglePrediction {
-				Value: []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]},
+				//Value: []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]},
+				Value: []float64{localScore, localBBcoefficient},
 			},
 		}
 		statusPacket := &Packet{

@@ -46,12 +46,10 @@ func (node *Node) AggregateAllPredictions() *SinglePrediction {
 			(node.allExternalPredictionsObtained() && node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated) {
 			// aggregate predictions, send the final
 
-			//node.CurrentStatus.StatusValue.CurrentPrediction.Value[0] = node.LocalDecision.scores[node.DetectionClass]
-			//node.CurrentStatus.StatusValue.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
-
-			//accumulatedPrediction := node.CurrentStatus.StatusValue.CurrentPrediction
-			//newPrediction := []float64{accumulatedPrediction.Value[0], accumulatedPrediction.Value[1]}
-			newPrediction := []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]}
+			// node.LocalDecision can be accessed concurrently through this function, by updateOpinionVector, by HandleReceivedProbe
+			//newPrediction := []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]}
+			localScore, localBBcoefficient := node.LocalDecision.getOpinion(node.DetectionClass)
+			newPrediction := []float64{localScore, localBBcoefficient}
 			for host, _ := range node.Peers {
 				externalPrediction := node.GetPrediction(host)
 				if externalPrediction != nil {

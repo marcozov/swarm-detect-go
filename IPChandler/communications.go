@@ -26,7 +26,7 @@ func (node *Node) HandleLocalPrediction(channel chan []byte) {
 		//fmt.Println("printing converted structure: ")
 		//fmt.Println(res)
 		node.ReceivedLocalPredictions++
-		node.updateOpinionVector(res)
+		node.LocalDecision.updateOpinionVector(res)
 
 		if node.ReceivedLocalPredictions == 20 {
 			node.CurrentStatus.mux.Lock()
@@ -34,8 +34,8 @@ func (node *Node) HandleLocalPrediction(channel chan []byte) {
 			// probably no need to save the state, since it is sent only to one host (the leader)
 			if node.CurrentStatus.StatusValue.CurrentState == WaitingForLocalPredictions {
 				fmt.Println("I finished accumulating data for this round!")
-				//node.CurrentStatus.StatusValue.CurrentPrediction.Value[0] = node.LocalDecision.scores[node.DetectionClass]
-				//node.CurrentStatus.StatusValue.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
+					//node.CurrentStatus.StatusValue.CurrentPrediction.Value[0] = node.LocalDecision.scores[node.DetectionClass]
+					//node.CurrentStatus.StatusValue.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
 				node.CurrentStatus.StatusValue.CurrentState = LocalPredictionsTerminated
 				node.PredictionsAggregatorHandler <- struct{}{}
 			}

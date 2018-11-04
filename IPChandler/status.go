@@ -95,22 +95,3 @@ func (node *Node) HandleReceivedStatus(packet *Packet, senderAddress net.UDPAddr
 	}
 	//fmt.Println("finished handling status message ..")
 }
-
-func (node *Node) updateOpinionVector(localPrediction map[int][]float64) {
-	alpha := node.LocalDecision.alpha
-	//fmt.Println("Updating local opinion vector..")
-	//for k, v := range localPrediction {
-	for k := 1; k < DetectionClasses; k++ {
-		v, exists := localPrediction[k]
-		if !exists {
-			v = []float64{0, 0}
-		}
-
-		//fmt.Println("")
-		//fmt.Println("coefficients: ", node.LocalDecision.boundingBoxCoefficients)
-
-
-		node.LocalDecision.boundingBoxCoefficients[k] = alpha*v[1] + node.LocalDecision.boundingBoxCoefficients[k]*(1-alpha)
-		node.LocalDecision.scores[k] = alpha*v[0] + node.LocalDecision.scores[k]*(1-alpha)
-	}
-}

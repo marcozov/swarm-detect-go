@@ -4,7 +4,6 @@ import (
 	"net"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -52,31 +51,9 @@ type SinglePredictionWithSender struct {
 	Sender string
 }
 
-type LocalOpinionVector struct {
-	alpha float64
-	scores [DetectionClasses]float64
-	boundingBoxCoefficients [DetectionClasses]float64
-	mux sync.Mutex
-}
-
 type Peer struct {
 	peerAddress    *net.UDPAddr
 }
-
-func (node *Node) updateOpinionValue(class uint64, coefficient, score float64) {
-	node.LocalDecision.mux.Lock()
-	defer node.LocalDecision.mux.Unlock()
-
-	node.LocalDecision.scores[class] = node.LocalDecision.scores[class]*(1-coefficient) + score*coefficient
-}
-
-//func (node *Node) AddAcknowledgedPeer(peer Peer) {
-//	node.AcknowledgedPeers.addPeer(peer)
-//}
-//
-//func (node *Node) GetAcknowledgedPeer(peerAddress net.UDPAddr) *Peer {
-//	return node.AcknowledgedPeers.getPeer(peerAddress)
-//}
 
 func NewNode(address, name, peers string, detectionClass int) *Node {
 	udpAddress, err := net.ResolveUDPAddr("udp4", address)

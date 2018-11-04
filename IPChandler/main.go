@@ -46,8 +46,8 @@ func main() {
 	// dummy leader init: assuming that it is fixed for now
 	if leader, exists := node.Peers[*leaderDummy]; exists {
 		node.Leader = leader
-	} else if node.Address.String() == *leaderDummy{
-		node.Leader = Peer{ peerAddress:node.Address }
+	} else if node.Address.String() == *leaderDummy {
+		node.Leader = Peer{peerAddress: node.Address}
 	}
 
 	startMessagesChannel := make(chan *Packet)
@@ -69,7 +69,6 @@ func main() {
 
 	go node.opinionVectorDEBUG()
 
-
 	go node.periodicPeersProbe()
 	go node.AggregateAllPredictions()
 	go node.propagateStatusMessage()
@@ -81,7 +80,7 @@ func main() {
 		removeSocket(completeSocketPath)
 	}
 
-	l, err := net.ListenUnix("unix",  &net.UnixAddr{completeSocketPath, "unix"})
+	l, err := net.ListenUnix("unix", &net.UnixAddr{completeSocketPath, "unix"})
 	if err != nil {
 		panic(fmt.Sprintf("Error in opening UNIX socket listener: %s\n", err))
 	}
@@ -114,44 +113,10 @@ func main() {
 			// 2.2) otherwise, some kind of entropy can be determined
 			// in any case, data should be propagated to other hosts in this phase..
 
-
 			localPredictionsChannel <- buf[:n]
 		}
 
 		conn.Close()
 	}
 
-
 }
-
-/*
-func main() {
-	//connectionCreation:
-	conn, err := net.ListenUnixgram("unixgram",  &net.UnixAddr{"/tmp/unixdomain", "unixgram"})
-	if err != nil {
-		panic(err)
-	}
-	defer os.Remove("/tmp/go.sock")
-
-
-	//connectionCreation:
-	//
-	//conn, err := l.AcceptUnix()
-	//if err != nil {
-	//	panic(err)
-	//}
-
-	for {
-		var buf [4096]byte
-		n, err := conn.Read(buf[:])
-		if err != nil {
-			fmt.Println("Error in reading data:", err)
-			//conn.Close()
-			//goto connectionCreation
-			//panic(err)
-		}
-		fmt.Printf("%s\n", string(buf[:n]));
-	}
-
-	conn.Close()
-}*/
