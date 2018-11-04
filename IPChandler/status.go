@@ -5,26 +5,7 @@ import (
 	"net"
 )
 
-/*
-// handling round advancement
-func (node *Node) HandleRounds() {
-	ticker := time.NewTicker(1*time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case _ = <- ticker.C:
-			if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated && node.RemainingPeers.Length() == 0 {
-				//node.startRound(1)
-				node.startNewRound()
-			}
-		}
-	}
-}
-*/
-
 // need to make sure that this is really called only once: what about locking the status or the round?
-//func (node *Node) startRound(newRound uint64) {
 func (node *Node) startNewRound() {
 	node.CurrentStatus.mux.Lock()
 	defer node.CurrentStatus.mux.Unlock()
@@ -64,10 +45,9 @@ func (node *Node) propagateStatusMessage() {
 //func (node *Node) updateExternalPredictions(channel chan SinglePredictionWithSender) {
 func (node *Node) updateExternalPredictions() {
 	for {
-		//prediction := <- channel
-		//prediction := <- node.ExternalPredictionsHandler
 		predictionPacket := <- node.ExternalPredictionsHandler
-		prediction := predictionPacket.Status.CurrentPrediction
+		//prediction := predictionPacket.Status.CurrentPrediction
+		prediction := predictionPacket.Packet.Status.CurrentPrediction
 		sender := predictionPacket.SenderAddress
 		fmt.Println("external prediction: ", prediction)
 		if node.isLeader() {
@@ -104,8 +84,12 @@ func (node *Node) HandleReceivedStatus(packet *Packet, senderAddress net.UDPAddr
 				//	Prediction: currentPrediction,
 				//	Sender:     senderAddress.String(),
 				//}
-				packet.SenderAddress = &senderAddress
-				node.ExternalPredictionsHandler <- packet
+				//packet.SenderAddress = &senderAddress
+				packetWrapper := &PacketWithSender{
+					Packet: packet,
+					SenderAddress: &senderAddress,
+				}
+				node.ExternalPredictionsHandler <- packetWrapper
 			}
 		}
 	}
@@ -130,40 +114,3 @@ func (node *Node) updateOpinionVector(localPrediction map[int][]float64) {
 		node.LocalDecision.scores[k] = alpha*v[0] + node.LocalDecision.scores[k]*(1-alpha)
 	}
 }
-
-/*
-// the end message will arrive from the leader
-func (node *Node) HandleReceivedEndRound(packet *Packet, senderAddress net.UDPAddr) {
-	if senderAddress.String() == node.Leader.peerAddress.String() {
-		myCurrentRond := node.CurrentStatus.StatusValue.CurrentRound
-		packetRoundID := packet.End.RoundID
-		fmt.Println("my current round: ", myCurrentRond, " packetRoundID: ", packetRoundID)
-		if myCurrentRond == packetRoundID {
-			node.RemoveRemainingPeer(senderAddress)
-		}
-	}
-}
-*/
-
-/*
-// sending the accumulated local prediction
-func (node *Node) PropagateLocalPredictions() {
-	ticker := time.NewTicker(1*time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case _ = <- ticker.C:
-			fmt.Println("current state: ", node.CurrentStatus.StatusValue.CurrentState, "leader: ", node.Leader.peerAddress.String(), " my address: ", node.Address.String())
-			if node.Leader.peerAddress.String() != node.Address.String() {
-				if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated {
-					statusPacket := &Packet{
-						Status: &node.CurrentStatus.StatusValue,
-					}
-					node.StatusHandler <- statusPacket
-				}
-			}
-		}
-	}
-}
-*/

@@ -53,11 +53,11 @@ func main() {
 	startMessagesChannel := make(chan *Packet)
 	statusMessagesChannel := make(chan *Packet)
 	localPredictionsChannel := make(chan []byte)
-	//externalPredictionsChannel := make(chan SinglePredictionWithSender)
-	externalPredictionsChannel := make(chan *Packet)
+	externalPredictionsChannel := make(chan *PacketWithSender)
 	endRoundMessagesChannel := make(chan *Packet)
 	predictionsAggregatorHandler := make(chan struct{})
 	endRoundHandler := make(chan struct{})
+	finalPredictionPropagationTerminate := make(chan struct{})
 
 	node.StartHandler = startMessagesChannel
 	node.StatusHandler = statusMessagesChannel
@@ -65,36 +65,16 @@ func main() {
 	node.EndRoundMessageHandler = endRoundMessagesChannel
 	node.PredictionsAggregatorHandler = predictionsAggregatorHandler
 	node.EndRoundHandler = endRoundHandler
+	node.FinalPredictionPropagationTerminate = finalPredictionPropagationTerminate
 
 	go node.opinionVectorDEBUG()
 
-	//go func() {
-	//	time.Sleep(10*time.Second)
-	//	node.CurrentStatus.StatusValue.CurrentState = LocalPredictionsTerminated
-	//} ()
 
-	//node.startRound(1)
-	//go node.HandleRounds()
 	go node.periodicPeersProbe()
-
-	//go node.
 	go node.AggregateAllPredictions()
-
-	//go node.propagateStartMessage(startMessagesChannel)
-
-	//go node.propagateStatusMessage(statusMessagesChannel)
 	go node.propagateStatusMessage()
-	//go node.PropagateLocalPredictions()
-
 	go node.HandleLocalPrediction(localPredictionsChannel)
-	//go node.updateExternalPredictions(externalPredictionsChannel)
 	go node.updateExternalPredictions()
-
-	//go node.PropagateEndRoundMessage(endRoundMessagesChannel)
-	//go node.TriggerEndRoundMessagePropagation()
-
-	//go node.statusDebug()
-	//go node.triggerPropagators()
 	go node.handleIncomingMessages()
 
 	if _, err := os.Stat(completeSocketPath); os.IsExist(err) {
@@ -135,7 +115,6 @@ func main() {
 			// in any case, data should be propagated to other hosts in this phase..
 
 
-			//fmt.Printf("IPC handler got: %s\n(%d bytes)", string(buf[:n]), n);
 			localPredictionsChannel <- buf[:n]
 		}
 

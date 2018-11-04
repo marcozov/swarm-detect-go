@@ -35,9 +35,11 @@ type Node struct {
 	//ExternalPredictions map[string]SinglePredictionWithSender
 	ExternalPredictions *SafeMapSinglePredictions
 	//ExternalPredictionsHandler chan SinglePredictionWithSender
-	ExternalPredictionsHandler chan *Packet
+	//ExternalPredictionsHandler chan *Packet
+	ExternalPredictionsHandler chan *PacketWithSender
 	PredictionsAggregatorHandler chan struct{}
 	EndRoundHandler chan struct{}
+	FinalPredictionPropagationTerminate chan struct{}
 	DetectionClass int // the object that we are trying to detect
 }
 
@@ -165,8 +167,4 @@ func (node *Node) statusDebug() {
 
 func (status *Status) String() string {
 	return fmt.Sprintf("Current round: %d, state of the round: %s, current prediction: %s", status.CurrentRound, status.CurrentState, status.CurrentPrediction)
-}
-
-func entropy(scores []float32) float32 {
-	return 0
 }

@@ -10,9 +10,23 @@ import (
 // this should be done only by the follower nodes
 func (node *Node) HandleReceivedProbe(packet *Packet, senderAddress net.UDPAddr) {
 	if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated {
-		statusPacket := &Packet{
-			Status: &node.CurrentStatus.StatusValue,
+		node.CurrentStatus.mux.Lock()
+		//newPrediction := []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]}
+
+		statusToSend := Status{
+			CurrentRound: node.CurrentStatus.StatusValue.CurrentRound,
+			CurrentState: node.CurrentStatus.StatusValue.CurrentState,
+			CurrentPrediction: SinglePrediction {
+				Value: []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]},
+			},
 		}
+		statusPacket := &Packet{
+			//Status: &node.CurrentStatus.StatusValue,
+			Status: &statusToSend,
+		}
+
+		node.CurrentStatus.mux.Unlock()
+
 		node.StatusHandler <- statusPacket
 	}
 }
@@ -43,7 +57,6 @@ func (node *Node) probeFollowers() {
 
 	peersToProbe := make(map[string]Peer)
 	for k, v := range node.Peers {
-		//if _, exists := node.ExternalPredictions[k]; !exists {
 		if prediction := node.ExternalPredictions.getPrediction(k); prediction == nil {
 			peersToProbe[k] = v
 		}

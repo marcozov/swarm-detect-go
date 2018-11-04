@@ -59,5 +59,9 @@ type Packet struct {
 	Status          *Status
 	Probe 			*ProbeMessage
 	Ack 			*AcknowledgementMessage
+}
+
+type PacketWithSender struct {
+	Packet 			*Packet
 	SenderAddress	*net.UDPAddr
 }

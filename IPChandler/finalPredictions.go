@@ -17,7 +17,7 @@ func (node *Node) HandleReceivedFinalPrediction(packet *Packet, senderAddress ne
 		}
 		node.sendToPeer(ack, *node.GetPeer(senderAddress))
 
-		fmt.Println("final prediction (received from leader): ", finalPrediction.Prediction)
+		fmt.Println("************** FINAL PREDICTION RECEIVED FROM THE LEADER: ID: ", finalPrediction.ID, ", Prediction.Value: ", finalPrediction.Prediction.Value)
 		node.startNewRound()
 	}
 }
@@ -27,16 +27,15 @@ func (node *Node) HandleReceivedFinalPrediction(packet *Packet, senderAddress ne
 func (node *Node) HandleReceivedAcknowledgement(packet *Packet, senderAddress net.UDPAddr) {
 	fmt.Println("receiving ACK from ", senderAddress.String())
 	if node.isLeader() {
-		fmt.Println("Before removing peer: ", node.RemainingPeers.v)
+		//fmt.Println("Before removing peer: ", node.RemainingPeers.v)
 		node.RemoveRemainingPeer(senderAddress)
-		fmt.Println("After removing peer: ", node.RemainingPeers.v)
+		//fmt.Println("After removing peer: ", node.RemainingPeers.v)
 		node.EndRoundHandler <- struct{}{}
 	}
 }
 
 // send stuff to the channel whenever an element is added to ExternalPredictions
 // this should be done only by the leader node
-//func (node *Node) AggregateAllPredictions(aggregationConditionChecker chan struct{}, finishRoundChecker chan struct{}) *SinglePrediction {
 func (node *Node) AggregateAllPredictions() *SinglePrediction {
 	for {
 		// wait until I received all the external predictions and my state is LocalPredictionsTerminated
@@ -46,24 +45,40 @@ func (node *Node) AggregateAllPredictions() *SinglePrediction {
 		if   node.isLeader() &&
 			(node.allExternalPredictionsObtained() && node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated) {
 			// aggregate predictions, send the final
+
+			//node.CurrentStatus.StatusValue.CurrentPrediction.Value[0] = node.LocalDecision.scores[node.DetectionClass]
+			//node.CurrentStatus.StatusValue.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
+
+			//accumulatedPrediction := node.CurrentStatus.StatusValue.CurrentPrediction
+			//newPrediction := []float64{accumulatedPrediction.Value[0], accumulatedPrediction.Value[1]}
+			newPrediction := []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]}
+			for host, _ := range node.Peers {
+				externalPrediction := node.GetPrediction(host)
+				if externalPrediction != nil {
+					newPrediction[0] = newPrediction[0] + externalPrediction.Value[0]*externalPrediction.Value[1]
+					newPrediction[1] = newPrediction[1] + externalPrediction.Value[1]
+				}
+			}
+
 			prediction := FinalPredictionMessage{
 				ID: node.CurrentStatus.StatusValue.CurrentRound,
 				Prediction: &SinglePrediction {
-					Value: []float64{11, 23},
+					Value: []float64{newPrediction[0], newPrediction[1]},
 				},
 			}
 
-
-			fmt.Println("final prediction: ", prediction)
+			fmt.Println("************** FINAL PREDICTION THAT IS PROPAGATED TO THE OTHER HOSTS: ID: ", prediction.ID, ", Prediction.Value: ", prediction.Prediction.Value)
 			// trigger the final predictions forwarding
+
+			// this is executed
 			go node.propagateFinalPredictions(prediction)
 
 			// wait until I receive all acks
 			for {
-				//<- finishRoundChecker
 				// triggered everytime an ACK is received
 				<- node.EndRoundHandler
 				if node.RemainingPeers.Length() == 0 {
+					node.FinalPredictionPropagationTerminate <- struct{}{}
 					node.startNewRound()
 					break
 				}
@@ -82,12 +97,13 @@ func (node *Node) allExternalPredictionsObtained() bool {
 			fmt.Println("the peer ", peer, " did not send the prediction!")
 			return false
 		}
-
 	}
 
 	return true
 }
 
+// this function should terminate before the new round is started, otherwise it will
+// keep sending messages in the following rounds too
 func (node *Node) propagateFinalPredictions(prediction FinalPredictionMessage) {
 	packet := &Packet { FinalPrediction: &prediction}
 
@@ -104,6 +120,9 @@ func (node *Node) propagateFinalPredictions(prediction FinalPredictionMessage) {
 			}
 
 			node.sendToPeers(packet, node.RemainingPeers.v)
+		case _ = <- node.FinalPredictionPropagationTerminate:
+			return
 		}
+
 	}
 }
