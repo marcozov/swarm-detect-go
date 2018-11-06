@@ -4,7 +4,6 @@ import (
 	"net"
 	"fmt"
 	"strings"
-	"time"
 )
 
 type State int32
@@ -134,13 +133,6 @@ func (node *Node) isLeader() bool {
 //	myPeers[peerAddress.String()] = peerWrapper
 //	node.Peers = myPeers
 //}
-
-func (node *Node) statusDebug() {
-	for {
-		fmt.Println("STATUS DEBUG: ", node.CurrentStatus)
-		time.Sleep(5 * time.Second)
-	}
-}
 
 func (status *Status) String() string {
 	return fmt.Sprintf("Current round: %d, state of the round: %s, current prediction: %s", status.CurrentRound, status.CurrentState, status.CurrentPrediction)

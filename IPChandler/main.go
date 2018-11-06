@@ -51,29 +51,36 @@ func main() {
 	}
 
 	startMessagesChannel := make(chan *Packet)
-	statusMessagesChannel := make(chan *Packet)
+	//statusMessagesChannel := make(chan *Packet)
 	localPredictionsChannel := make(chan []byte)
-	externalPredictionsChannel := make(chan *PacketWithSender)
+	//externalPredictionsChannel := make(chan *PacketWithSender)
 	endRoundMessagesChannel := make(chan *Packet)
 	predictionsAggregatorHandler := make(chan struct{})
 	endRoundHandler := make(chan struct{})
 	finalPredictionPropagationTerminate := make(chan struct{})
 
 	node.StartHandler = startMessagesChannel
-	node.StatusHandler = statusMessagesChannel
-	node.ExternalPredictionsHandler = externalPredictionsChannel
+	//node.StatusHandler = statusMessagesChannel
+	//node.ExternalPredictionsHandler = externalPredictionsChannel
 	node.EndRoundMessageHandler = endRoundMessagesChannel
 	node.PredictionsAggregatorHandler = predictionsAggregatorHandler
 	node.EndRoundHandler = endRoundHandler
 	node.FinalPredictionPropagationTerminate = finalPredictionPropagationTerminate
 
-	go node.opinionVectorDEBUG()
+	//go node.opinionVectorDEBUG()
 
+	// periodic probes to the followers
 	go node.periodicPeersProbe()
+	// put together the external predictions and the local one, once everything is available
 	go node.AggregateAllPredictions()
-	go node.propagateStatusMessage()
+
+	// propagate my status in order to let the leader know my opinion
+	//go node.propagateStatusMessage()
+
+	// intercepting traffic from python process
 	go node.HandleLocalPrediction(localPredictionsChannel)
-	go node.updateExternalPredictions()
+	// getting a status message and saving the received external prediction
+	//go node.updateExternalPredictions()
 	go node.handleIncomingMessages()
 
 	if _, err := os.Stat(completeSocketPath); os.IsExist(err) {

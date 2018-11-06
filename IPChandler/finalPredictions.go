@@ -9,7 +9,11 @@ import (
 // receive final prediction, send ACK to the leader
 // done by the follower nodes
 func (node *Node) HandleReceivedFinalPrediction(packet *Packet, senderAddress net.UDPAddr) {
-	if !node.isLeader() && packet.FinalPrediction.ID == node.CurrentStatus.StatusValue.CurrentRound {
+	node.CurrentStatus.mux.Lock()
+	defer node.CurrentStatus.mux.Unlock()
+	//roundID := node.CurrentStatus.getRoundIDConcurrent()
+	roundID := node.CurrentStatus.StatusValue.CurrentRound
+	if !node.isLeader() && packet.FinalPrediction.ID == roundID {
 		finalPrediction := packet.FinalPrediction
 
 		ack := &Packet{
@@ -17,20 +21,22 @@ func (node *Node) HandleReceivedFinalPrediction(packet *Packet, senderAddress ne
 		}
 		node.sendToPeer(ack, *node.GetPeer(senderAddress))
 
-		fmt.Println("************** FINAL PREDICTION RECEIVED FROM THE LEADER: ID: ", finalPrediction.ID, ", Prediction.Value: ", finalPrediction.Prediction.Value)
-		node.startNewRound()
+		fmt.Println("************** FINAL PREDICTION RECEIVED FROM THE LEADER: ID: ", finalPrediction.ID, ", Prediction.Value: ", finalPrediction.Prediction.Value, ", normalized value: ", finalPrediction.Prediction.Value[0]/finalPrediction.Prediction.Value[1])
+		//node.startNewRound()
+		node.startNewRoundNoLOCK()
 	}
 }
 
 // receive and ACK ===> check whether all the peers have received my final prediction
 // done by the leader
 func (node *Node) HandleReceivedAcknowledgement(packet *Packet, senderAddress net.UDPAddr) {
-	fmt.Println("receiving ACK from ", senderAddress.String())
+	//fmt.Println("receiving ACK from ", senderAddress.String())
 	if node.isLeader() {
 		//fmt.Println("Before removing peer: ", node.RemainingPeers.v)
 		node.RemoveRemainingPeer(senderAddress)
 		//fmt.Println("After removing peer: ", node.RemainingPeers.v)
 		node.EndRoundHandler <- struct{}{}
+		//fmt.Println("After sending message to EndRoundHandler")
 	}
 }
 
@@ -39,7 +45,7 @@ func (node *Node) HandleReceivedAcknowledgement(packet *Packet, senderAddress ne
 func (node *Node) AggregateAllPredictions() *SinglePrediction {
 	for {
 		// wait until I received all the external predictions and my state is LocalPredictionsTerminated
-		fmt.Println("waiting ..")
+		//fmt.Println("AggregateAllPredictions (beginning) ..")
 		// 2 sources: communications.go (finish local prediction), status.go (received external prediction)
 		<- node.PredictionsAggregatorHandler
 		if   node.isLeader() &&
@@ -47,12 +53,13 @@ func (node *Node) AggregateAllPredictions() *SinglePrediction {
 			// aggregate predictions, send the final
 
 			// node.LocalDecision can be accessed concurrently through this function, by updateOpinionVector, by HandleReceivedProbe
-			//newPrediction := []float64{node.LocalDecision.scores[node.DetectionClass], node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]}
 			localScore, localBBcoefficient := node.LocalDecision.getOpinion(node.DetectionClass)
-			newPrediction := []float64{localScore, localBBcoefficient}
+			newPrediction := []float64{localScore*localBBcoefficient, localBBcoefficient}
+			//fmt.Println("local opinion: score=", localScore, ", localBBcoefficient=", localBBcoefficient)
 			for host, _ := range node.Peers {
 				externalPrediction := node.GetPrediction(host)
 				if externalPrediction != nil {
+					//fmt.Println("prediction coming from ", host, ": ", externalPrediction)
 					newPrediction[0] = newPrediction[0] + externalPrediction.Value[0]*externalPrediction.Value[1]
 					newPrediction[1] = newPrediction[1] + externalPrediction.Value[1]
 				}
@@ -65,7 +72,7 @@ func (node *Node) AggregateAllPredictions() *SinglePrediction {
 				},
 			}
 
-			fmt.Println("************** FINAL PREDICTION THAT IS PROPAGATED TO THE OTHER HOSTS: ID: ", prediction.ID, ", Prediction.Value: ", prediction.Prediction.Value)
+			fmt.Println("************** FINAL PREDICTION THAT IS PROPAGATED TO THE OTHER HOSTS: ID: ", prediction.ID, ", Prediction.Value: ", prediction.Prediction.Value, ", normalized value: ", prediction.Prediction.Value[0]/prediction.Prediction.Value[1])
 			// trigger the final predictions forwarding
 
 			// this is executed
@@ -74,12 +81,19 @@ func (node *Node) AggregateAllPredictions() *SinglePrediction {
 			// wait until I receive all acks
 			for {
 				// triggered everytime an ACK is received
+				fmt.Println("***** BEFORE receiving EndRoundHandler")
 				<- node.EndRoundHandler
+				//fmt.Println("received endRoundHandler. Peers: ", node.RemainingPeers.v)
+				fmt.Println("***** AFTER receiving EndRoundHandler")
 				if node.RemainingPeers.Length() == 0 {
 					node.FinalPredictionPropagationTerminate <- struct{}{}
 					node.startNewRound()
 					break
 				}
+			}
+		} else {
+			if node.isLeader() {
+				//fmt.Println("External predictions: ", node.ExternalPredictions.v, ", state: ", node.CurrentStatus.StatusValue.CurrentState)
 			}
 		}
 	}
@@ -89,10 +103,12 @@ func (node *Node) AggregateAllPredictions() *SinglePrediction {
 
 // checking whether all the external predictions have been received: necessary condition before performing the aggregation
 func (node *Node) allExternalPredictionsObtained() bool {
+	node.ExternalPredictions.mux.Lock()
+	defer node.ExternalPredictions.mux.Unlock()
 	for peer, _ := range node.Peers {
-		//if _, exists := node.ExternalPredictions[peer]; !exists {
-		if prediction := node.GetPrediction(peer); prediction == nil {
-			fmt.Println("the peer ", peer, " did not send the prediction!")
+		if _, exists := node.ExternalPredictions.v[peer]; !exists {
+		//if prediction := node.GetPrediction(peer); prediction == nil {
+		//	fmt.Println("the peer ", peer, " did not send the prediction!")
 			return false
 		}
 	}
@@ -105,15 +121,16 @@ func (node *Node) allExternalPredictionsObtained() bool {
 func (node *Node) propagateFinalPredictions(prediction FinalPredictionMessage) {
 	packet := &Packet { FinalPrediction: &prediction}
 
-	ticker := time.NewTicker(500*time.Millisecond)
+	ticker := time.NewTicker(1500*time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case _ = <- ticker.C:
-			fmt.Println("will propagate final predictions end? ", node.RemainingPeers.v)
+			fmt.Println("checking length! ...")
+			//fmt.Println("will propagate final predictions end? ", node.RemainingPeers.v)
 			if node.RemainingPeers.Length() == 0 {
-				fmt.Println("ending propagate final predictions")
+				//fmt.Println("ending propagate final predictions")
 				return
 			}
 

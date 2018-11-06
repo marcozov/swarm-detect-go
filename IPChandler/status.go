@@ -10,24 +10,40 @@ func (node *Node) startNewRound() {
 	node.CurrentStatus.mux.Lock()
 	defer node.CurrentStatus.mux.Unlock()
 
-	newRound := node.CurrentStatus.StatusValue.CurrentRound+1
-	//if node.CurrentStatus.CurrentRound < newRound {
+	fmt.Println("START NEW ROUND: BEGIN ***************************")
 
-		// keep the status as this until the end of this round (and the beginning of the new one)
-	//node.CurrentStatus.CurrentPrediction.Value[0] = node.LocalDecision.scores[node.DetectionClass]
-	//node.CurrentStatus.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
+	newRound := node.CurrentStatus.StatusValue.CurrentRound+1
+
+	// keep the status as this until the end of this round (and the beginning of the new one)
 	node.ReceivedLocalPredictions = 0
 	node.CurrentStatus.StatusValue.CurrentRound = newRound
 	node.CurrentStatus.StatusValue.CurrentState = WaitingForLocalPredictions
 
-	//node.ExternalPredictions = make(map[string]SinglePredictionWithSender)
-	//}
+	// re-initialize the set of peers that should send me the prediction in the current round
+	node.RemainingPeers = node.InitPeersMap()
+	node.ExternalPredictions = node.InitExternalPredictionsMap()
+
+	fmt.Println("START NEW ROUND: END ***************************")
+}
+
+func (node *Node) startNewRoundNoLOCK() {
+	fmt.Println("START NEW ROUND: BEGIN (no lock) ***************************")
+
+	newRound := node.CurrentStatus.StatusValue.CurrentRound+1
+
+	// keep the status as this until the end of this round (and the beginning of the new one)
+	node.ReceivedLocalPredictions = 0
+	node.CurrentStatus.StatusValue.CurrentRound = newRound
+	node.CurrentStatus.StatusValue.CurrentState = WaitingForLocalPredictions
 
 	// re-initialize the set of peers that should send me the prediction in the current round
 	node.RemainingPeers = node.InitPeersMap()
 	node.ExternalPredictions = node.InitExternalPredictionsMap()
+
+	fmt.Println("START NEW ROUND: END (no lock) ***************************")
 }
 
+/*
 // wrapper function to handle status message
 //func (node *Node) propagateStatusMessage(channel chan *Packet) {
 func (node *Node) propagateStatusMessage() {
@@ -39,59 +55,52 @@ func (node *Node) propagateStatusMessage() {
 		node.sendToPeers(status, node.RemainingPeers.v)
 	}
 }
+*/
 
+/*
 // wrapper function to handle external predictions
 // useful for concurrency issues
-//func (node *Node) updateExternalPredictions(channel chan SinglePredictionWithSender) {
 func (node *Node) updateExternalPredictions() {
 	for {
 		predictionPacket := <- node.ExternalPredictionsHandler
-		//prediction := predictionPacket.Status.CurrentPrediction
-		prediction := predictionPacket.Packet.Status.CurrentPrediction
+		//prediction := predictionPacket.Packet.Status.CurrentPrediction
 		sender := predictionPacket.SenderAddress
-		fmt.Println("external prediction: ", prediction)
+		//fmt.Println("external prediction: ", prediction)
 		if node.isLeader() {
 			//fmt.Println("external prediction: ", prediction)
-			//if _, ok := node.ExternalPredictions[prediction.Sender]; !ok {
 			if existingPrediction := node.ExternalPredictions.getPrediction(sender.String()); existingPrediction == nil {
-				fmt.Println("new prediction: ", prediction)
-				//fmt.Println("external predictions to consider in the final vote: ", node.ExternalPredictions)
-				//node.ExternalPredictions[prediction.Sender] = prediction
-				node.ExternalPredictions.addPrediction(sender.String(), prediction)
+				fmt.Println("new prediction: ", predictionPacket.Packet.Status.CurrentPrediction)
+				node.ExternalPredictions.addPrediction(sender.String(), predictionPacket.Packet.Status.CurrentPrediction)
 				// send signal to check that all external predictions have been received
 				node.PredictionsAggregatorHandler <- struct{}{}
 			}
 		}
 	}
 }
+*/
 
+// access to CurrentStatus: is there any concurrent access to CurrentRound?
+// CurrentRound is modified when a new round starts.
+// New rounds start after all external predictions have been received and after local prediction has been performed (state = 2)
 func (node *Node) HandleReceivedStatus(packet *Packet, senderAddress net.UDPAddr) {
 	// is any lock needed in order to access the status?
 	fmt.Println("Handling status message..")
-	//fmt.Println("status prediction: ", packet.Status.CurrentPrediction)
-	if senderAddress.String() != node.Leader.peerAddress.String() {
-
-		//if node.CurrentStatus.CurrentRound == packet.Status.CurrentRound && packet.Status.CurrentState == LocalPredictionsTerminated {
-		//fmt.Println("problem accessing the status?")
-		if node.CurrentStatus.StatusValue.CurrentRound == packet.Status.CurrentRound {
-			//fmt.Println("nop, I accessed")
-			if node.GetPeer(senderAddress) != nil {
-				//node.RemoveRemainingPeer(senderAddress)
-
-				// aggregate the information
-				//currentPrediction := packet.Status.CurrentPrediction
-				//node.ExternalPredictionsHandler <- SinglePredictionWithSender{
-				//	Prediction: currentPrediction,
-				//	Sender:     senderAddress.String(),
-				//}
-				//packet.SenderAddress = &senderAddress
-				packetWrapper := &PacketWithSender{
-					Packet: packet,
-					SenderAddress: &senderAddress,
-				}
-				node.ExternalPredictionsHandler <- packetWrapper
+	// the external prediction must not come from the leader..
+	if node.isLeader() && senderAddress.String() != node.Leader.peerAddress.String() &&
+		node.CurrentStatus.getRoundIDConcurrent() == packet.Status.CurrentRound &&
+		node.GetPeer(senderAddress) != nil {
+			if existingPrediction := node.ExternalPredictions.getPrediction(senderAddress.String()); existingPrediction == nil {
+				fmt.Println("new prediction: ", packet.Status.CurrentPrediction)
+				node.ExternalPredictions.addPrediction(senderAddress.String(), packet.Status.CurrentPrediction)
+				// send signal to check that all external predictions have been received
+				node.PredictionsAggregatorHandler <- struct{}{}
 			}
-		}
 	}
-	//fmt.Println("finished handling status message ..")
+}
+
+func (status *StatusConcurrent) getRoundIDConcurrent() uint64 {
+	status.mux.Lock()
+	defer status.mux.Unlock()
+
+	return status.StatusValue.CurrentRound
 }
