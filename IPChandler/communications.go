@@ -17,7 +17,6 @@ func (node *Node) HandleLocalPrediction(channel chan []byte) {
 		jsonMessage := <- channel
 
 		// TODO: replace json with gRPC
-		//res := make(map[string][]float64)
 		res := make(map[int][]float64)
 		err := json.Unmarshal(jsonMessage, &res)
 
@@ -30,13 +29,11 @@ func (node *Node) HandleLocalPrediction(channel chan []byte) {
 		node.ReceivedLocalPredictions++
 		node.LocalDecision.updateOpinionVector(res)
 
-		if node.ReceivedLocalPredictions == 4 {
+		if node.ReceivedLocalPredictions == 1 {
 			node.CurrentStatus.mux.Lock()
 			// probably no need to save the state, since it is sent only to one host (the leader)
 			if node.CurrentStatus.StatusValue.CurrentState == WaitingForLocalPredictions {
 				fmt.Println("I finished accumulating data for this round!")
-					//node.CurrentStatus.StatusValue.CurrentPrediction.Value[0] = node.LocalDecision.scores[node.DetectionClass]
-					//node.CurrentStatus.StatusValue.CurrentPrediction.Value[1] = node.LocalDecision.boundingBoxCoefficients[node.DetectionClass]
 				node.CurrentStatus.StatusValue.CurrentState = LocalPredictionsTerminated
 				node.CurrentStatus.mux.Unlock()
 				node.PredictionsAggregatorHandler <- struct{}{}
@@ -77,17 +74,15 @@ func (node *Node) handleIncomingMessages() {
 		// may need to be expanded to support bigger messages..
 		udpBuffer := make([]byte, 32)
 		packet := &Packet{}
-		//fmt.Println("WAT ********************")
 		n, senderAddress, err := node.Connection.ReadFromUDP(udpBuffer)
-		//fmt.Println("read bytes: ", n, "from ", senderAddress, "encoded (receiving) packet: ", udpBuffer)
 
 		if err != nil {
 			panic(fmt.Sprintf("error in reading UDP data: %s.\nudpBuffer: %v\nsenderAddress: %s\nn bytes: %d", err, udpBuffer, senderAddress.String(), n))
 		}
-		//fmt.Println("debug received MESSAGE: ", udpBuffer)
+
+		udpBuffer = udpBuffer[:n]
 		err = protobuf.Decode(udpBuffer, packet)
 
-		fmt.Printf("udpBuffer (no error): %v\n", udpBuffer)
 		if err != nil {
 			panic(fmt.Sprintf("error in decoding UDP data: %s\nudpBuffer: %v\nsenderAddress: %s\npacket: %s\nn bytes: %d", err, udpBuffer, senderAddress.String(), packet, n))
 		}

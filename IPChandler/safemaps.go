@@ -11,7 +11,6 @@ type SafeMapPeers struct {
 }
 
 type SafeMapSinglePredictions struct {
-	//v 	map[string]SinglePredictionWithSender
 	v 	map[string]SinglePrediction
 	mux sync.Mutex
 }

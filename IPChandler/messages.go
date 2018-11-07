@@ -18,14 +18,6 @@ type PredictionMessage struct {
 	Entropy float32
 }
 
-type StartMessage struct {
-	RoundID uint64
-}
-
-type EndRoundMessage struct {
-	RoundID uint64
-}
-
 type ProbeMessage struct {
 	RoundID uint64
 }
@@ -51,11 +43,7 @@ type FinalPredictionMessage struct {
 }
 
 type Packet struct {
-	//FinalPrediction *PredictionMessage
-	//FinalPrediction *SinglePrediction
 	FinalPrediction *FinalPredictionMessage
-	Start           *StartMessage
-	End             *EndRoundMessage
 	Status          *Status
 	Probe 			*ProbeMessage
 	Ack 			*AcknowledgementMessage

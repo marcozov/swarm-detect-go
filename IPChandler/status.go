@@ -43,42 +43,6 @@ func (node *Node) startNewRoundNoLOCK() {
 	fmt.Println("START NEW ROUND: END (no lock) ***************************")
 }
 
-/*
-// wrapper function to handle status message
-//func (node *Node) propagateStatusMessage(channel chan *Packet) {
-func (node *Node) propagateStatusMessage() {
-	for {
-		//status := <- channel
-		status := <- node.StatusHandler
-		fmt.Printf("STATUS message to send to everyone: %s. Remaining peers: %s\n", status, node.RemainingPeers)
-
-		node.sendToPeers(status, node.RemainingPeers.v)
-	}
-}
-*/
-
-/*
-// wrapper function to handle external predictions
-// useful for concurrency issues
-func (node *Node) updateExternalPredictions() {
-	for {
-		predictionPacket := <- node.ExternalPredictionsHandler
-		//prediction := predictionPacket.Packet.Status.CurrentPrediction
-		sender := predictionPacket.SenderAddress
-		//fmt.Println("external prediction: ", prediction)
-		if node.isLeader() {
-			//fmt.Println("external prediction: ", prediction)
-			if existingPrediction := node.ExternalPredictions.getPrediction(sender.String()); existingPrediction == nil {
-				fmt.Println("new prediction: ", predictionPacket.Packet.Status.CurrentPrediction)
-				node.ExternalPredictions.addPrediction(sender.String(), predictionPacket.Packet.Status.CurrentPrediction)
-				// send signal to check that all external predictions have been received
-				node.PredictionsAggregatorHandler <- struct{}{}
-			}
-		}
-	}
-}
-*/
-
 // access to CurrentStatus: is there any concurrent access to CurrentRound?
 // CurrentRound is modified when a new round starts.
 // New rounds start after all external predictions have been received and after local prediction has been performed (state = 2)

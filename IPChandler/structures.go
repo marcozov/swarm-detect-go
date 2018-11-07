@@ -11,7 +11,6 @@ type State int32
 const (
 	WaitingForLocalPredictions  = iota+1
 	LocalPredictionsTerminated
-	FinalPredictionTerminated
 )
 
 const DetectionClasses int = 91
@@ -23,17 +22,10 @@ type Node struct {
 	Peers      map[string]Peer   // set of known peers
 	RemainingPeers *SafeMapPeers // set of peers from which the host needs the prediction (for the current round)
 	Leader Peer
-	//CurrentStatus *Status
 	CurrentStatus *StatusConcurrent
-	StartHandler chan *Packet
-	StatusHandler chan *Packet
-	EndRoundMessageHandler chan *Packet
 	LocalDecision LocalOpinionVector // accumulator of the local predictions
 	ReceivedLocalPredictions int
-	//ExternalPredictions map[string]SinglePredictionWithSender
 	ExternalPredictions *SafeMapSinglePredictions
-	//ExternalPredictionsHandler chan SinglePredictionWithSender
-	//ExternalPredictionsHandler chan *Packet
 	ExternalPredictionsHandler chan *PacketWithSender
 	PredictionsAggregatorHandler chan struct{}
 	EndRoundHandler chan struct{}
@@ -43,11 +35,6 @@ type Node struct {
 
 type SinglePrediction struct {
 	Value []float64
-}
-
-type SinglePredictionWithSender struct {
-	Prediction SinglePrediction
-	Sender string
 }
 
 type Peer struct {
@@ -86,13 +73,11 @@ func NewNode(address, name, peers string, detectionClass int) *Node {
 		},
 
 		ReceivedLocalPredictions: 0,
-		//ExternalPredictions: make(map[string]SinglePredictionWithSender),
 		DetectionClass: detectionClass,
 	}
 
 
 	for _, peer := range strings.Split(peers, ",") {
-		//node.addPeer(peer)
 		myPeers := node.Peers
 
 		peerAddress, err := net.ResolveUDPAddr("udp4", peer)
@@ -117,22 +102,6 @@ func NewNode(address, name, peers string, detectionClass int) *Node {
 func (node *Node) isLeader() bool {
 	return node.Address.String() == node.Leader.peerAddress.String()
 }
-
-//func (node *Node) addPeer(peer string) {
-//	myPeers := node.Peers
-//
-//	peerAddress, err := net.ResolveUDPAddr("udp4", peer)
-//	if err != nil {
-//		panic(fmt.Sprintf("Error in parsing the UDP peerAddress: %s", err))
-//	}
-//
-//	peerWrapper := Peer {
-//		peerAddress: peerAddress,
-//	}
-//
-//	myPeers[peerAddress.String()] = peerWrapper
-//	node.Peers = myPeers
-//}
 
 func (status *Status) String() string {
 	return fmt.Sprintf("Current round: %d, state of the round: %s, current prediction: %s", status.CurrentRound, status.CurrentState, status.CurrentPrediction)

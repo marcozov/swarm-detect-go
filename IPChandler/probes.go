@@ -26,11 +26,8 @@ func (node *Node) HandleReceivedProbe(packet *Packet, senderAddress net.UDPAddr)
 			Status: &statusToSend,
 		}
 
-		//node.sendToPeers(statusPacket, node.RemainingPeers.v)
 		fmt.Println("probe received by ", senderAddress.String(), ". STATUS to propagate: ", statusPacket)
 		node.sendToPeer(statusPacket, node.Peers[senderAddress.String()])
-
-		//node.StatusHandler <- statusPacket
 	} else {
 		node.CurrentStatus.mux.Unlock()
 	}
@@ -45,12 +42,8 @@ func (node *Node) periodicPeersProbe() {
 	for {
 		select {
 		case _ = <- ticker.C:
-			//if node.isLeader() && !node.allExternalPredictionsObtained() {
-			//	node.probeFollowers()
-			//}
-
 			if node.isLeader() {
-				node.probeFollowersVer2()
+				node.probeFollowers()
 			}
 		}
 	}
@@ -58,25 +51,6 @@ func (node *Node) periodicPeersProbe() {
 
 // probe the peers that still need to send me their prediction
 func (node *Node) probeFollowers() {
-	roundID := node.CurrentStatus.getRoundIDConcurrent()
-	packet := &Packet {
-		Probe: &ProbeMessage {
-			RoundID: roundID,
-		},
-	}
-
-	peersToProbe := make(map[string]Peer)
-	for k, v := range node.Peers {
-		if prediction := node.ExternalPredictions.getPrediction(k); prediction == nil {
-			peersToProbe[k] = v
-		}
-	}
-	//fmt.Println("will probe: ", peersToProbe)
-	node.sendToPeers(packet, peersToProbe)
-}
-
-// probe the peers that still need to send me their prediction
-func (node *Node) probeFollowersVer2() {
 	node.ExternalPredictions.mux.Lock()
 	defer node.ExternalPredictions.mux.Unlock()
 	roundID := node.CurrentStatus.getRoundIDConcurrent()
@@ -88,11 +62,9 @@ func (node *Node) probeFollowersVer2() {
 
 	peersToProbe := make(map[string]Peer)
 	for k, v := range node.Peers {
-		//if prediction := node.ExternalPredictions.getPrediction(k); prediction == nil {
 		if _, exists := node.ExternalPredictions.v[k]; !exists {
 			peersToProbe[k] = v
 		}
 	}
-	//fmt.Println("will probe: ", peersToProbe)
 	node.sendToPeers(packet, peersToProbe)
 }
