@@ -7,6 +7,11 @@ import (
 	"flag"
 	"strings"
 	//"time"
+	"github.com/marcozov/swarm-detect-go/structures"
+	_ "net/http/pprof"
+	"net/http"
+	"log"
+	"strconv"
 )
 
 func removeSocket(socketPath string) {
@@ -18,62 +23,85 @@ func removeSocket(socketPath string) {
 
 // For now, the hosts in the network are assumed to be known: static configuration
 func main() {
-	fmt.Println("start: ", WaitingForLocalPredictions)
-	fmt.Println("finish: ", LocalPredictionsTerminated)
+
+
+
+	fmt.Println("start: ", structures.WaitingForLocalPredictions)
+	fmt.Println("finish: ", structures.LocalPredictionsTerminated)
 	address := flag.String("address", "127.0.0.1:5000", "ip:port for the node")
-	name := flag.String("name", "", "name of the node")
+	nodeID := flag.Int("nodeID", -1, "ID of the node")
 	peers := flag.String("peers", "", "comma separated list of peers of the form ip:port")
 	leaderDummy := flag.String("leader", "", "ip:port for the leader")
+	baseStation := flag.String("BS", "", "ip:port for the base station")
 
 	detectionClass := flag.String("class", "person", "define the object to detect")
 	classesMapping := map[string]int{
 		"person": 1,
+		"bottle": 44,
+		"tv": 72,
+		"mouse": 74,
+		"keyboard": 76,
+		"cellphone": 77,
+		"book": 84,
 	}
 
 	fmt.Println("class: ", classesMapping[*detectionClass])
 	flag.Parse()
+
+	//wat := 6060 + *nodeID
+	//fmt.Println("wat: ", wat)
+	//asd := fmt.Sprintf("localhost:%s", strconv.Itoa(wat))
+	//fmt.Println("asd: ", asd)
+	go func() {
+		log.Println(http.ListenAndServe(fmt.Sprintf("localhost:%s", strconv.Itoa(6060 + *nodeID)), nil))
+	}()
 
 	completeSocketPath := "/tmp/go" + strings.Split(*address, ":")[1] + ".sock"
 
 	// the UDP channel could be probably be opened at the beginning
 	// One is going to be ok! It can be used for sending and receiving data
 	fmt.Println(*address)
-	fmt.Println(*name)
+	fmt.Println(*nodeID)
 	fmt.Println(*peers)
 
-	node := NewNode(*address, *name, *peers, classesMapping[*detectionClass])
+	node := structures.NewNode(*address, *baseStation, int8(*nodeID), *peers, classesMapping[*detectionClass])
 
 	// dummy leader init: assuming that it is fixed for now
 	if leader, exists := node.Peers[*leaderDummy]; exists {
 		node.Leader = leader
 	} else if node.Address.String() == *leaderDummy {
-		node.Leader = Peer{peerAddress: node.Address}
+		node.Leader = structures.Peer{PeerAddress: node.Address}
 	}
 
 	localPredictionsChannel := make(chan []byte)
 	predictionsAggregatorHandler := make(chan struct{})
 	endRoundHandler := make(chan struct{})
 	finalPredictionPropagationTerminate := make(chan struct{})
+	timeoutHandler := make(chan struct{})
 
 	node.PredictionsAggregatorHandler = predictionsAggregatorHandler
 	node.EndRoundHandler = endRoundHandler
 	node.FinalPredictionPropagationTerminate = finalPredictionPropagationTerminate
+	node.TimeoutHandler = timeoutHandler
 
 	//go node.opinionVectorDEBUG()
 
 	// periodic probes to the followers
-	go node.periodicPeersProbe()
+	go node.PeriodicPeersProbe()
 	// put together the external predictions and the local one, once everything is available
 	go node.AggregateAllPredictions()
 
 	// intercepting traffic from python process
 	go node.HandleLocalPrediction(localPredictionsChannel)
 	// getting a status message and saving the received external prediction
-	go node.handleIncomingMessages()
+	go node.HandleIncomingMessages()
 
-	if _, err := os.Stat(completeSocketPath); os.IsExist(err) {
+	if _, err := os.Stat(completeSocketPath); !os.IsNotExist(err) {
 		removeSocket(completeSocketPath)
 	}
+
+	node.StartNewRound()
+	fmt.Println("status: ", node.CurrentStatus.StatusValue)
 
 	l, err := net.ListenUnix("unix", &net.UnixAddr{completeSocketPath, "unix"})
 	if err != nil {
