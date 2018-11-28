@@ -31,7 +31,6 @@ func main() {
 	address := flag.String("address", "127.0.0.1:5000", "ip:port for the node")
 	nodeID := flag.Int("nodeID", -1, "ID of the node")
 	peers := flag.String("peers", "", "comma separated list of peers of the form ip:port")
-	leaderDummy := flag.String("leader", "", "ip:port for the leader")
 	baseStation := flag.String("BS", "", "ip:port for the base station")
 
 	detectionClass := flag.String("class", "person", "define the object to detect")
@@ -66,41 +65,50 @@ func main() {
 
 	node := structures.NewNode(*address, *baseStation, int8(*nodeID), *peers, classesMapping[*detectionClass])
 
-	// dummy leader init: assuming that it is fixed for now
-	if leader, exists := node.Peers[*leaderDummy]; exists {
-		node.Leader = leader
-	} else if node.Address.String() == *leaderDummy {
-		node.Leader = structures.Peer{PeerAddress: node.Address}
-	}
-
 	localPredictionsChannel := make(chan []byte)
-	predictionsAggregatorHandler := make(chan struct{})
-	endRoundHandler := make(chan struct{})
-	finalPredictionPropagationTerminate := make(chan struct{})
+
+	//predictionsAggregatorHandler := make(chan struct{})
+	//endRoundHandler := make(chan struct{})
+	//finalPredictionPropagationTerminate := make(chan struct{})
+
 	timeoutHandler := make(chan struct{})
+	packetHandler := make(chan structures.PacketChannelMessage)
+	finalPredictionHandler := make(chan int8)
+	startRoundHandler := make(chan uint64)
 
-	node.PredictionsAggregatorHandler = predictionsAggregatorHandler
-	node.EndRoundHandler = endRoundHandler
-	node.FinalPredictionPropagationTerminate = finalPredictionPropagationTerminate
+	//node.PredictionsAggregatorHandler = predictionsAggregatorHandler
+	//node.EndRoundHandler = endRoundHandler
+	//node.FinalPredictionPropagationTerminate = finalPredictionPropagationTerminate
 	node.TimeoutHandler = timeoutHandler
+	node.PacketHandler = packetHandler
+	node.FinalPredictionHandler = finalPredictionHandler
+	node.StartRoundHandler = startRoundHandler
 
-	//go node.opinionVectorDEBUG()
+//go node.opinionVectorDEBUG()
 
 	// periodic probes to the followers
+	go node.ProcessMessage(packetHandler)
+
 	go node.PeriodicPeersProbe()
+
 	// put together the external predictions and the local one, once everything is available
-	go node.AggregateAllPredictions()
+	//go node.AggregateAllPredictions()
 
 	// intercepting traffic from python process
 	go node.HandleLocalPrediction(localPredictionsChannel)
 	// getting a status message and saving the received external prediction
 	go node.HandleIncomingMessages()
 
+	go node.HandleFinalPredictions()
+	go node.HandleStartRound()
+	go node.TimeoutTrigger()
+
 	if _, err := os.Stat(completeSocketPath); !os.IsNotExist(err) {
 		removeSocket(completeSocketPath)
 	}
 
-	node.StartNewRound()
+	//node.StartNewRound()
+	node.StartRound(1, true, true)
 	fmt.Println("status: ", node.CurrentStatus.StatusValue)
 
 	l, err := net.ListenUnix("unix", &net.UnixAddr{completeSocketPath, "unix"})

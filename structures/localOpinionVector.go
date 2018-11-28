@@ -26,11 +26,11 @@ func (vector *LocalOpinionVector) getOpinionBoundingBox(class int) float64 {
 	return vector.boundingBoxCoefficients[class]
 }
 
-func (vector *LocalOpinionVector) getOpinion(class int) (float64, float64, float64) {
+func (vector *LocalOpinionVector) getOpinion(class int) (float64, float64) {
 	vector.mux.Lock()
 	defer vector.mux.Unlock()
 
-	return vector.scores[class], vector.boundingBoxCoefficients[class], vector.entropies[class]
+	return vector.scores[class], vector.boundingBoxCoefficients[class]
 }
 
 func (vector *LocalOpinionVector) updateSingleOpinion(class int, newScore, newBBcoefficient float64) {
@@ -48,11 +48,10 @@ func (vector *LocalOpinionVector) updateOpinionVector(localPrediction map[int][]
 	for k := 1; k < DetectionClasses; k++ {
 		v, exists := localPrediction[k]
 		if !exists {
-			v = []float64{0, 0, 1}
+			v = []float64{0, 0}
 		}
 
 		vector.boundingBoxCoefficients[k] = vector.alpha*v[1] + vector.boundingBoxCoefficients[k]*(1-vector.alpha)
 		vector.scores[k] = vector.alpha*v[0] + vector.scores[k]*(1-vector.alpha)
-		vector.entropies[k] = vector.alpha*v[2] + vector.entropies[k]*(1-vector.alpha)
 	}
 }

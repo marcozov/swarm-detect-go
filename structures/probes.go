@@ -11,24 +11,36 @@ import (
 // this should be done only by the follower nodes
 func (node *Node) HandleReceivedProbe(packet *Packet, senderAddress net.UDPAddr) {
 	node.CurrentStatus.mux.Lock()
-	if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated &&
-		node.CurrentStatus.StatusValue.CurrentRound <= packet.Probe.RoundID {
+	fmt.Println("handling probe: ", packet.Probe)
 
-		localScore, localBBcoefficient, localEntropy := node.LocalDecision.getOpinion(node.DetectionClass)
+	// if Probe.RoundID > CurrentRound, start a new round
+	if packet.Probe.RoundID > node.CurrentStatus.StatusValue.CurrentRound {
+		// should be done before completing the rest of the function?
+		//node.StartRoundHandler <- packet.Probe.RoundID
+		node.StartRound(packet.Probe.RoundID, false, false)
+	}
+
+	//if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated &&
+	//	packet.Probe.RoundID >= node.CurrentStatus.StatusValue.CurrentRound {
+	// send status in any case..
+	if node.CurrentStatus.StatusValue.CurrentState == LocalPredictionsTerminated {
+		fmt.Println("before getting local opinion ..")
+		localScore, localBBcoefficient := node.LocalDecision.getOpinion(node.DetectionClass)
+		fmt.Println("after getting local opinion ..")
 		statusToSend := Status{
 			CurrentRound: node.CurrentStatus.StatusValue.CurrentRound,
 			CurrentState: node.CurrentStatus.StatusValue.CurrentState,
 			CurrentPrediction: SinglePrediction {
-				Value: []float64{localScore, localBBcoefficient, localEntropy},
+				Value: []float64{localScore, localBBcoefficient},
 			},
 		}
 
 		//node.startNewRoundNoLOCK()
-		if node.CurrentStatus.StatusValue.CurrentRound < packet.Probe.RoundID {
-			node.startNewRoundNoLOCKwithRound(packet.Probe.RoundID)
-		}
+		//if node.CurrentStatus.StatusValue.CurrentRound < packet.Probe.RoundID {
+		//	node.startNewRoundNoLOCKwithRound(packet.Probe.RoundID)
+		//}
 
-		node.CurrentStatus.mux.Unlock()
+		//node.CurrentStatus.mux.Unlock()
 
 		statusPacket := &Packet{
 			Status: &statusToSend,
@@ -36,9 +48,9 @@ func (node *Node) HandleReceivedProbe(packet *Packet, senderAddress net.UDPAddr)
 
 		fmt.Println("probe received by ", senderAddress.String(), ". STATUS to propagate: ", statusPacket)
 		node.sendToPeer(statusPacket, node.Peers[senderAddress.String()])
-	} else {
-		node.CurrentStatus.mux.Unlock()
 	}
+
+	node.CurrentStatus.mux.Unlock()
 }
 
 // periodically send probes to the peers
@@ -67,13 +79,18 @@ func (node *Node) probeFollowers() {
 			RoundID: roundID,
 		},
 	}
-	fmt.Println("sending probe.. ", packet.Probe)
+	//fmt.Println("sending probe.. ", packet.Probe)
+	//fmt.Println("remaining peers: ", node.RemainingPeers.v)
 
 	peersToProbe := make(map[string]Peer)
 	for k, v := range node.Peers {
-		if _, exists := node.ExternalPredictions.v[k]; !exists {
+		//fmt.Println("peer: ", k)
+		//if _, exists := node.ExternalPredictions.v[k]; !exists {
+		if _, exists := node.RemainingPeers.v[k]; exists {
 			peersToProbe[k] = v
 		}
 	}
+
+	//fmt.Println("peers to probe: ", peersToProbe)
 	node.sendToPeers(packet, peersToProbe)
 }

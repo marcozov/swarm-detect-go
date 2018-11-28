@@ -1,6 +1,10 @@
-./IPChandler -nodeID=1 -address=127.0.0.1:5001 -peers=127.0.0.1:5002,127.0.0.1:5003 -leader=127.0.0.1:5001 -class=person -BS=127.0.0.1:3000
-./IPChandler -nodeID=2 -address=127.0.0.1:5002 -peers=127.0.0.1:5001,127.0.0.1:5003 -leader=127.0.0.1:5001 -class=person -BS=127.0.0.1:3000
-./IPChandler -nodeID=3 -address=127.0.0.1:5003 -peers=127.0.0.1:5001,127.0.0.1:5002 -leader=127.0.0.1:5001 -class=person -BS=127.0.0.1:3000
+./IPChandler -nodeID=1 -address=127.0.0.1:5001 -peers=127.0.0.1:5002,127.0.0.1:5003 -class=person -BS=127.0.0.1:3000
+./IPChandler -nodeID=2 -address=127.0.0.1:5002 -peers=127.0.0.1:5001,127.0.0.1:5003 -class=person -BS=127.0.0.1:3000
+./IPChandler -nodeID=3 -address=127.0.0.1:5003 -peers=127.0.0.1:5001,127.0.0.1:5002 -class=person -BS=127.0.0.1:3000
+
+./IPChandler -nodeID=1 -address=127.0.0.1:5001 -peers=127.0.0.2:5002,127.0.0.3:5003 -class=person -BS=127.0.0.4:3000
+./IPChandler -nodeID=2 -address=127.0.0.2:5002 -peers=127.0.0.1:5001,127.0.0.3:5003 -class=person -BS=127.0.0.4:3000
+./IPChandler -nodeID=3 -address=127.0.0.3:5003 -peers=127.0.0.1:5001,127.0.0.2:5002 -class=person -BS=127.0.0.4:3000
 
 ./IPChandler -name=nodeA -address=10.10.0.104:5001 -peers=10.10.0.105:5002,10.10.0.106:5003 -leader=10.10.0.104:5001 -class=person
 ./IPChandler -name=nodeB -address=10.10.0.105:5002 -peers=10.10.0.104:5001,10.10.0.106:5003 -leader=10.10.0.104:5001 -class=person

@@ -2,7 +2,6 @@ package structures
 
 import (
 	"sync"
-	"net"
 )
 
 type ProbeMessage struct {
@@ -34,9 +33,9 @@ type Packet struct {
 	Status          *Status
 	Probe 			*ProbeMessage
 	Ack 			*AcknowledgementMessage
+	StartRound		*StartRoundMessage
 }
 
-type PacketWithSender struct {
-	Packet 			*Packet
-	SenderAddress	*net.UDPAddr
+type StartRoundMessage struct {
+	RoundID uint64
 }
