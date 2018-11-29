@@ -76,7 +76,7 @@ func main() {
 */
 
 func main() {
-	address := flag.String("address", "127.0.0.4:3000", "ip:port for the node")
+	address := flag.String("address", "192.168.0.100:3000", "ip:port for the node")
 
 	udpAddress, err := net.ResolveUDPAddr("udp4", *address)
 	if err != nil {
@@ -120,6 +120,7 @@ func main() {
 		}
 
 		//udpConnection.WriteToUDP()
+		fmt.Println("sending ack back to ", senderAddress.String())
 		structures.SendToPeer(ack, senderAddress, udpConnection)
 	}
 }

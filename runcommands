@@ -1,0 +1,36 @@
+./IPChandler -nodeID=1 -address=127.0.0.1:5001 -peers=127.0.0.1:5002,127.0.0.1:5003 -class=person -BS=127.0.0.1:3000
+./IPChandler -nodeID=2 -address=127.0.0.1:5002 -peers=127.0.0.1:5001,127.0.0.1:5003 -class=person -BS=127.0.0.1:3000
+./IPChandler -nodeID=3 -address=127.0.0.1:5003 -peers=127.0.0.1:5001,127.0.0.1:5002 -class=person -BS=127.0.0.1:3000
+
+./IPChandler -nodeID=1 -address=127.0.0.1:5001 -peers=127.0.0.2:5002,127.0.0.3:5003 -class=person -BS=127.0.0.4:3000
+./IPChandler -nodeID=2 -address=127.0.0.2:5002 -peers=127.0.0.1:5001,127.0.0.3:5003 -class=person -BS=127.0.0.4:3000
+./IPChandler -nodeID=3 -address=127.0.0.3:5003 -peers=127.0.0.1:5001,127.0.0.2:5002 -class=person -BS=127.0.0.4:3000
+
+./IPChandler -nodeID=1 -address=10.10.0.104:5001 -peers=10.10.0.105:5002,10.10.0.106:5003 -class=person -BS=127.0.0.4:3000
+./IPChandler -nodeID=2 -address=10.10.0.105:5002 -peers=10.10.0.104:5001,10.10.0.106:5003 -class=person -BS=127.0.0.4:3000
+./IPChandler -nodeID=3 -address=10.10.0.106:5003 -peers=10.10.0.104:5001,10.10.0.105:5002 -class=person -BS=127.0.0.4:3000
+
+as BSListener: put ethernet address of the odroid
+./IPChandler -nodeID=1 -address=10.10.0.104:5001 -peers=10.10.0.105:5002,10.10.0.106:5003 -class=person -BS=192.168.0.100:3000
+./IPChandler -nodeID=2 -address=10.10.0.105:5002 -peers=10.10.0.104:5001,10.10.0.106:5003 -class=person -BS=192.168.0.100:3000
+./IPChandler -nodeID=3 -address=10.10.0.106:5003 -peers=10.10.0.104:5001,10.10.0.105:5002 -class=person -BS=192.168.0.100:3000
+
+ip="$(ifconfig | grep -A 1 'eth0' | tail -1 | cut -d ':' -f 2 | cut -d ' ' -f 1)"
+./IPChandler -name=host_$ip -address=$ip -peers=
+
+./IPChandler -nodeID=1 -address=127.0.0.1:5001 -peers=127.0.0.1:5002 -leader=127.0.0.1:5001 -class=person -BS=127.0.0.1:3000
+./IPChandler -nodeID=2 -address=127.0.0.1:5002 -peers=127.0.0.1:5001 -leader=127.0.0.1:5001 -class=person -BS=127.0.0.1:3000
+
+
+*** COPY commands ***
+scp IPChandler/*go root@192.168.0.101:/root/go/src/github.com/marcozov/swarm-detect-go/IPChandler/
+scp IPChandler/*go root@192.168.0.102:/root/go/src/github.com/marcozov/swarm-detect-go/IPChandler/
+scp IPChandler/*go root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-detect-go/IPChandler/
+
+scp structures/*go root@192.168.0.101:/root/go/src/github.com/marcozov/swarm-detect-go/structures/
+scp structures/*go root@192.168.0.102:/root/go/src/github.com/marcozov/swarm-detect-go/structures/
+scp structures/*go root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-detect-go/structures/
+
+scp runcommands root@192.168.0.101:/root/go/src/github.com/marcozov/swarm-detect-go/
+scp runcommands root@192.168.0.102:/root/go/src/github.com/marcozov/swarm-detect-go/
+scp runcommands root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-detect-go/

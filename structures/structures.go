@@ -80,7 +80,8 @@ type Peer struct {
 	PeerAddress   	*net.UDPAddr
 }
 
-func NewNode(address, baseStationAddress string, id int8, peers string, detectionClass int) *Node {
+func NewNode(address, baseStationAddress, baseStationListenerIP string, id int8, peers string, detectionClass int) *Node {
+	// communication channel with the other wifi hosts
 	udpAddress, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
 		panic (fmt.Sprintf("Address not valid: %s", err))
@@ -91,12 +92,23 @@ func NewNode(address, baseStationAddress string, id int8, peers string, detectio
 		panic (fmt.Sprintf("Error in opening UDP listener: %s", err))
 	}
 
+
+	// resolving address of the BS, for future communication
 	udpBaseStationAddress, err := net.ResolveUDPAddr("udp4", baseStationAddress)
 	if err != nil {
 		panic (fmt.Sprintf("Address not valid: %s", err))
 	}
 
-	wat := udpAddress.IP.String() + ":" + strconv.Itoa(udpBaseStationAddress.Port + int(id))
+	// opening communication channel with the BS
+	// ideally, the IP address should be the same as the wifi address ( baseStationListenerIP == "" )
+	// however, in development setup, we can decide to make it communicate through the ethernet connection that is used in order to setup an ssh communication
+	// 		-> in this case, baseStationListenerIP == "192.168.0.10X"
+	if baseStationListenerIP == "" {
+		baseStationListenerIP = udpAddress.IP.String()
+	}
+
+	//wat := udpAddress.IP.String() + ":" + strconv.Itoa(udpBaseStationAddress.Port + int(id))
+	wat := baseStationListenerIP + ":" + strconv.Itoa(udpBaseStationAddress.Port + int(id))
 	udpBaseStationLocalListenerAddress, err := net.ResolveUDPAddr("udp4", wat)
 	fmt.Println("BS listener: ", wat)
 	udpBaseStationConnection, err := net.ListenUDP("udp4", udpBaseStationLocalListenerAddress)
@@ -104,11 +116,7 @@ func NewNode(address, baseStationAddress string, id int8, peers string, detectio
 		panic (fmt.Sprintf("Error in opening UDP listener: %s", err))
 	}
 
-	//err = udpBaseStationConnection.SetReadDeadline(time.Now().Add(50000*time.Millisecond))
-	//time.Sleep(50000*time.Millisecond)
-	//if err != nil {
-	//	panic(fmt.Sprintf("Error in setting the deadline: %s", err))
-	//}
+
 
 
 	myPeers := make(map[string]Peer)

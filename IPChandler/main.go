@@ -32,6 +32,7 @@ func main() {
 	nodeID := flag.Int("nodeID", -1, "ID of the node")
 	peers := flag.String("peers", "", "comma separated list of peers of the form ip:port")
 	baseStation := flag.String("BS", "", "ip:port for the base station")
+	baseStationListenerIP := flag.String("BSListener", "", "ip for the base station listener")
 
 	detectionClass := flag.String("class", "person", "define the object to detect")
 	classesMapping := map[string]int{
@@ -46,6 +47,7 @@ func main() {
 
 	fmt.Println("class: ", classesMapping[*detectionClass])
 	flag.Parse()
+
 
 	//wat := 6060 + *nodeID
 	//fmt.Println("wat: ", wat)
@@ -63,7 +65,7 @@ func main() {
 	fmt.Println(*nodeID)
 	fmt.Println(*peers)
 
-	node := structures.NewNode(*address, *baseStation, int8(*nodeID), *peers, classesMapping[*detectionClass])
+	node := structures.NewNode(*address, *baseStation, *baseStationListenerIP, int8(*nodeID), *peers, classesMapping[*detectionClass])
 
 	localPredictionsChannel := make(chan []byte)
 

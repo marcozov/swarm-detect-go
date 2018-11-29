@@ -90,6 +90,7 @@ func (node *Node) HandleFinalPredictions() {
 		for {
 			udpBuffer := make([]byte, 64)
 
+			//fmt.Println("sending final prediction to (BS): ", node.BaseStationAddress.String())
 			SendToPeer(finalPredictionPacket, node.BaseStationAddress, node.BaseStationConnection)
 			fmt.Println("trying to read from base station ..")
 
@@ -97,12 +98,12 @@ func (node *Node) HandleFinalPredictions() {
 			// will try to send multiple messages for node.FinalPredictionHandler channel and
 			// that subroutine will be stuck until this function finishes handling the communication
 			// with the base station
-			err := node.BaseStationConnection.SetReadDeadline(time.Now().Add(500*time.Millisecond))
+			err := node.BaseStationConnection.SetReadDeadline(time.Now().Add(1500*time.Millisecond))
 			if err != nil {
 				panic(fmt.Sprintf("Error in setting the deadline: %s", err))
 			}
 
-
+			//fmt.Println("local listener address for receiving BS data: ", node.BaseStationLocalListenerAddress)
 			n, senderAddress, err := node.BaseStationConnection.ReadFromUDP(udpBuffer)
 
 			if err != nil {
