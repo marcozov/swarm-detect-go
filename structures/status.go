@@ -91,15 +91,22 @@ func (node *Node) HandleReceivedStatus(packet *Packet, senderAddress net.UDPAddr
 	if node.isLeader() && packet.Status.CurrentRound >= node.CurrentStatus.StatusValue.CurrentRound {
 		if _, exists := node.RemainingPeers.v[senderAddress.String()]; exists || senderAddress.String() == node.Address.String() {
 			node.RemoveRemainingPeer(senderAddress)
-			if packet.Status.CurrentPrediction.Value[0] >= node.ConfidenceThresholds[node.DetectionClass] {
-				node.RemainingNeededPositiveVotes = node.RemainingNeededPositiveVotes-1
-			}
 
 			fmt.Println("remaining needed positive votes: ", node.RemainingNeededPositiveVotes)
-			if node.RemainingNeededPositiveVotes == 0 {
-				fmt.Println("Object present! Creating prediction..")
-				node.FinalPredictionHandler <- Present
-			} else if node.RemainingNeededPositiveVotes > 0 {
+			if packet.Status.CurrentPrediction.Value[0] >= node.ConfidenceThresholds[node.DetectionClass] {
+				node.RemainingNeededPositiveVotes = node.RemainingNeededPositiveVotes-1
+
+				if node.RemainingNeededPositiveVotes == 0 {
+					fmt.Println("Object present! Creating prediction..")
+					node.FinalPredictionHandler <- Present
+				}
+			}
+
+			//if node.RemainingNeededPositiveVotes == 0 {
+			//	fmt.Println("Object present! Creating prediction..")
+			//	node.FinalPredictionHandler <- Present
+			//} else if node.RemainingNeededPositiveVotes > 0 {
+			if node.RemainingNeededPositiveVotes > 0 {
 				node.ReceivedLocal.mux.Lock()
 				if len(node.RemainingPeers.v) == 0 && node.ReceivedLocal.Value {
 					fmt.Println("Object absent! Creating prediction..")
@@ -113,7 +120,7 @@ func (node *Node) HandleReceivedStatus(packet *Packet, senderAddress net.UDPAddr
 
 func (node *Node) TimeoutTrigger() {
 	for {
-		timer := time.NewTimer(10*time.Second)
+		timer := time.NewTimer(5*time.Second)
 		fmt.Println("new timer has started!")
 
 		for {

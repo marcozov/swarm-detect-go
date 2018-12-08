@@ -1,0 +1,7 @@
+ip link set wlp3s0 down
+iw wlp3s0 set type ibss
+ip link set wlp3s0 up
+
+iw wlp3s0 ibss join adhoc-test 2412
+
+ip address add 10.10.0.110/24 dev wlp3s0

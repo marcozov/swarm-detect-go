@@ -39,6 +39,7 @@ func main() {
 		"person": 1,
 		"bottle": 44,
 		"tv": 72,
+		"laptop": 73,
 		"mouse": 74,
 		"keyboard": 76,
 		"cellphone": 77,

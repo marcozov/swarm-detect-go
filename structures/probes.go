@@ -91,6 +91,6 @@ func (node *Node) probeFollowers() {
 		}
 	}
 
-	//fmt.Println("peers to probe: ", peersToProbe)
+	fmt.Println("peers to probe: ", peersToProbe)
 	node.sendToPeers(packet, peersToProbe)
 }

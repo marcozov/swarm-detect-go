@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net"
 	"sync"
+	"strconv"
 )
 
 // handling the prediction received from the python process
@@ -120,6 +121,32 @@ func (node *Node) HandleIncomingMessages() {
 		node.PacketHandler <- PacketChannelMessage{packet, senderAddress, counter}
 
 		//go node.processMessage(packet, senderAddress, counter)
+	}
+}
+
+func (node *Node) realBroadcast(packet *Packet) {
+	RealBroadcast(packet, node.Connection, node.Address)
+}
+
+func RealBroadcast(packet *Packet, connection *net.UDPConn, address *net.UDPAddr) {
+	fmt.Println("sending: ", packet.Probe)
+	packetBytes, err := protobuf.Encode(packet)
+
+	if err != nil {
+		panic(fmt.Sprintf("Error in encoding the message: %s\npacket: %s\npacketBytes: %s\n", err, packet, packetBytes))
+	}
+
+
+	mask := net.CIDRMask(24, 32)
+	broadcastAddress := address.IP.Mask(mask)
+	broadcastAddress[3] = 255
+
+	udpBroadcastAddress, err := net.ResolveUDPAddr("udp4", broadcastAddress.String() + ":" + strconv.Itoa(address.Port))
+
+	fmt.Println("broadcast address: ", udpBroadcastAddress.String())
+	_, err = connection.WriteToUDP(packetBytes, udpBroadcastAddress)
+	if err != nil {
+		panic(fmt.Sprintf("Error in sending udp data: %s\npacket: %s\npacketBytes: %s\n", err, packet, packetBytes))
 	}
 }
 

@@ -34,3 +34,10 @@ scp structures/*go root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-det
 scp runcommands root@192.168.0.101:/root/go/src/github.com/marcozov/swarm-detect-go/
 scp runcommands root@192.168.0.102:/root/go/src/github.com/marcozov/swarm-detect-go/
 scp runcommands root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-detect-go/
+
+
+scp IPChandler/*go root@192.168.0.101:/root/go/src/github.com/marcozov/swarm-detect-go/IPChandler/ && scp IPChandler/*go root@192.168.0.102:/root/go/src/github.com/marcozov/swarm-detect-go/IPChandler/ && scp IPChandler/*go root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-detect-go/IPChandler/
+
+scp structures/*go root@192.168.0.101:/root/go/src/github.com/marcozov/swarm-detect-go/structures/ && scp structures/*go root@192.168.0.102:/root/go/src/github.com/marcozov/swarm-detect-go/structures/ && scp structures/*go root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-detect-go/structures/
+
+scp runcommands root@192.168.0.101:/root/go/src/github.com/marcozov/swarm-detect-go/ && scp runcommands root@192.168.0.102:/root/go/src/github.com/marcozov/swarm-detect-go/ && scp runcommands root@192.168.0.103:/root/go/src/github.com/marcozov/swarm-detect-go/

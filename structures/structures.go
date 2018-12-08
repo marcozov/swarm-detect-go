@@ -153,6 +153,7 @@ func NewNode(address, baseStationAddress, baseStationListenerIP string, id int8,
 			1: 0.5,
 			44: 0.12,
 			72: 0.4,
+			73: 0.8,
 		},
 
 		//TimeoutWrapper: false,
