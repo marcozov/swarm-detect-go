@@ -19,7 +19,7 @@ Our system is able to improve detection accuracy by eliminating some false posit
     3. Run base station to receive rounds' predictions: baseStation/baseStation --address=<IP:PORT>, IP:PORT indicate the address for reaching the base station
     4. Run the hosts in the swarm: IPChandler/IPChandler
     
-Execution sample (3 nodes, local network and local base station):
+### Execution sample (3 nodes, local network and local base station):
     - baseStation/baseStation -address=127.0.0.1:3000
     - IPChandler/IPChandler -nodeID=1 -address=127.0.0.1:5001 -peers=127.0.0.1:5002,127.0.0.1:5003 -class=person -BS=127.0.0.1:3000
     - IPChandler/IPChandler -nodeID=2 -address=127.0.0.1:5002 -peers=127.0.0.1:5001,127.0.0.1:5003 -class=person -BS=127.0.0.1:3000
