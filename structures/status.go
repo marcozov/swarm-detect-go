@@ -19,7 +19,6 @@ func (node *Node) startNewRoundNoLOCKwithRound(newRound uint64) {
 	node.RemainingPeers = node.InitPeersMap()
 	node.ExternalPredictions = node.InitExternalPredictionsMap()
 
-	//node.TimeoutWrapper = false
 	node.Timeout.mux.Lock()
 	node.Timeout.Timeout = false
 	node.Timeout.mux.Unlock()
@@ -48,7 +47,6 @@ func (node *Node) startNewRoundNoLOCKwithRound(newRound uint64) {
 	} ()
 
 	fmt.Println("status (round) after changing round: ", node.CurrentStatus.StatusValue.CurrentRound)
-	//fmt.Println("START NEW ROUND: END (no lock) ***************************")
 }
 
 func (node *Node) timeout() bool {
@@ -130,9 +128,6 @@ func (node *Node) TimeoutTrigger() {
 					fmt.Println("timeout occurred!")
 					node.FinalPredictionHandler <- Timeout
 				} else {
-					//node.CurrentStatus.mux.Lock()
-					//node.StartRound(node.CurrentStatus.StatusValue.CurrentRound+1, false, true)
-					//node.CurrentStatus.mux.Unlock()
 					node.CurrentStatus.mux.Lock()
 					node.StartRoundHandler <- node.CurrentStatus.StatusValue.CurrentRound+1
 					node.CurrentStatus.mux.Unlock()
@@ -160,7 +155,6 @@ func (status *StatusConcurrent) getRoundIDConcurrent() uint64 {
 func (node *Node) HandleStartRound() {
 	for {
 		roundID := <- node.StartRoundHandler
-		//node.startNewRoundNoLOCKwithRound(roundID)
 		node.StartRound(roundID, true, true)
 	}
 }

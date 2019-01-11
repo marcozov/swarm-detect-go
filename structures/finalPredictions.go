@@ -10,16 +10,11 @@ import (
 // receive final prediction, send ACK to the leader
 // done by the follower nodes
 func (node *Node) HandleReceivedFinalPrediction(packet *Packet, senderAddress net.UDPAddr) {
-	fmt.Println("received final prediction: ", packet.FinalPrediction)
 
 	node.CurrentStatus.mux.Lock()
 	defer node.CurrentStatus.mux.Unlock()
-	//roundID := node.CurrentStatus.getRoundIDConcurrent()
 	roundID := node.CurrentStatus.StatusValue.CurrentRound
 
-	//if !node.timeout() && packet.FinalPrediction.ID >= roundID {
-	//	node.TimeoutHandler <- struct{}{}
-	//}
 	if !node.isLeader() && packet.FinalPrediction.ID == roundID {
 		finalPrediction := packet.FinalPrediction
 
@@ -29,8 +24,6 @@ func (node *Node) HandleReceivedFinalPrediction(packet *Packet, senderAddress ne
 		node.sendToPeer(ack, *node.GetPeer(senderAddress))
 
 		fmt.Println("************** FINAL PREDICTION RECEIVED FROM THE LEADER: ID: ", finalPrediction.ID, ", Prediction.Value: ", finalPrediction.Prediction.Value, ", normalized value: ", finalPrediction.Prediction.Value[0]/finalPrediction.Prediction.Value[1], ", MAX SCORE: ", finalPrediction.Prediction.Value[2])
-		//node.StartNewRound()
-		//node.startNewRoundNoLOCK()
 		node.startNewRoundNoLOCKwithRound(packet.FinalPrediction.ID)
 	}
 }
@@ -38,13 +31,8 @@ func (node *Node) HandleReceivedFinalPrediction(packet *Packet, senderAddress ne
 // receive and ACK ===> check whether all the peers have received my final prediction
 // done by the leader
 func (node *Node) HandleReceivedAcknowledgement(packet *Packet, senderAddress net.UDPAddr) {
-	//fmt.Println("receiving ACK from ", senderAddress.String())
 	if node.isLeader() {
-		//fmt.Println("Before removing peer: ", node.RemainingPeers.v)
 		node.RemoveRemainingPeer(senderAddress)
-		//fmt.Println("After removing peer: ", node.RemainingPeers.v)
-		//node.EndRoundHandler <- struct{}{}
-		//fmt.Println("After sending message to EndRoundHandler")
 	}
 }
 
@@ -55,17 +43,11 @@ const (
 )
 
 
-//func (node *Node) HandleFinalPredictions(channel chan int8) {
 func (node *Node) HandleFinalPredictions() {
 	for {
 		fmt.Println("waiting for channel (final prediction handler) message ..")
 		action := <- node.FinalPredictionHandler
 		fmt.Println("received channel (final prediction handler) message!")
-
-		// checking whether the base station has already received the prediction of this round
-		//if node.ReceivedAcknowledgements[node.BaseStationAddress.String()] {
-		//	continue
-		//}
 
 		prediction := FinalPredictionMessage{
 			ID: node.CurrentStatus.StatusValue.CurrentRound,

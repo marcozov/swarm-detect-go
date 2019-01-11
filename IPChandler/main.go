@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"flag"
 	"strings"
-	//"time"
 	"github.com/marcozov/swarm-detect-go/structures"
 	_ "net/http/pprof"
 	"net/http"
@@ -46,14 +45,9 @@ func main() {
 		"book": 84,
 	}
 
-	fmt.Println("class: ", classesMapping[*detectionClass])
 	flag.Parse()
 
 
-	//wat := 6060 + *nodeID
-	//fmt.Println("wat: ", wat)
-	//asd := fmt.Sprintf("localhost:%s", strconv.Itoa(wat))
-	//fmt.Println("asd: ", asd)
 	go func() {
 		log.Println(http.ListenAndServe(fmt.Sprintf("localhost:%s", strconv.Itoa(6060 + *nodeID)), nil))
 	}()
@@ -70,24 +64,17 @@ func main() {
 
 	localPredictionsChannel := make(chan []byte)
 
-	//predictionsAggregatorHandler := make(chan struct{})
-	//endRoundHandler := make(chan struct{})
-	//finalPredictionPropagationTerminate := make(chan struct{})
 
 	timeoutHandler := make(chan struct{})
 	packetHandler := make(chan structures.PacketChannelMessage)
 	finalPredictionHandler := make(chan int8)
 	startRoundHandler := make(chan uint64)
 
-	//node.PredictionsAggregatorHandler = predictionsAggregatorHandler
-	//node.EndRoundHandler = endRoundHandler
-	//node.FinalPredictionPropagationTerminate = finalPredictionPropagationTerminate
 	node.TimeoutHandler = timeoutHandler
 	node.PacketHandler = packetHandler
 	node.FinalPredictionHandler = finalPredictionHandler
 	node.StartRoundHandler = startRoundHandler
 
-//go node.opinionVectorDEBUG()
 
 	// periodic probes to the followers
 	go node.ProcessMessage(packetHandler)
@@ -95,7 +82,6 @@ func main() {
 	go node.PeriodicPeersProbe()
 
 	// put together the external predictions and the local one, once everything is available
-	//go node.AggregateAllPredictions()
 
 	// intercepting traffic from python process
 	go node.HandleLocalPrediction(localPredictionsChannel)
@@ -138,14 +124,6 @@ func main() {
 				//goto connectionCreation
 				break
 			}
-
-			// data should now be interpreted from JSON and put in proper structure
-			// 1) how often data will arrive?
-			// 2) in what format? A single score/class/box or multiple values?
-			// 2.1) if a single score/class/box is received, then it would be pretty hard to
-			//		define some quality metrics in the system --> but lighter protocol
-			// 2.2) otherwise, some kind of entropy can be determined
-			// in any case, data should be propagated to other hosts in this phase..
 
 			localPredictionsChannel <- buf[:n]
 		}

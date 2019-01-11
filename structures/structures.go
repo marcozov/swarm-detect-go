@@ -107,7 +107,6 @@ func NewNode(address, baseStationAddress, baseStationListenerIP string, id int8,
 		baseStationListenerIP = udpAddress.IP.String()
 	}
 
-	//wat := udpAddress.IP.String() + ":" + strconv.Itoa(udpBaseStationAddress.Port + int(id))
 	wat := baseStationListenerIP + ":" + strconv.Itoa(udpBaseStationAddress.Port + int(id))
 	udpBaseStationLocalListenerAddress, err := net.ResolveUDPAddr("udp4", wat)
 	fmt.Println("BS listener: ", wat)
@@ -156,7 +155,6 @@ func NewNode(address, baseStationAddress, baseStationListenerIP string, id int8,
 			73: 0.8,
 		},
 
-		//TimeoutWrapper: false,
 		Timeout: TimeoutWrapper{
 			Timeout: false,
 		},
@@ -194,8 +192,6 @@ func NewNode(address, baseStationAddress, baseStationListenerIP string, id int8,
 }
 
 func (node *Node) isLeader() bool {
-	//return node.Address.String() == node.Leader.PeerAddress.String()
-	//fmt.Println("leader? nodeID: ", uint64(node.nodeID), ", modulo: ", (node.CurrentStatus.StatusValue.CurrentRound % uint64(len(node.Peers) + 1)), ", currentRound: ", node.CurrentStatus.StatusValue.CurrentRound, "len+1: ", uint64(len(node.Peers) + 1))
 	return (uint64(node.nodeID) % uint64(len(node.Peers) + 1)) == (node.CurrentStatus.StatusValue.CurrentRound % uint64(len(node.Peers) + 1))
 }
 

@@ -24,8 +24,6 @@ func (node *Node) HandleLocalPrediction(channel chan []byte) {
 			panic(fmt.Sprintf("error in decoding json: %s\n", err))
 		}
 
-		//fmt.Println("printing converted structure: ")
-		//fmt.Println(res)
 		node.ReceivedLocalPredictions++
 		node.LocalDecision.updateOpinionVector(res)
 
@@ -43,10 +41,6 @@ func (node *Node) HandleLocalPrediction(channel chan []byte) {
 
 				// handling a local prediction as an external one!
 				localScore, _ := node.LocalDecision.getOpinion(node.DetectionClass)
-				//presence := 0.0
-				//if localScore >= node.ConfidenceThresholds[node.DetectionClass] {
-				//	presence = 1
-				//}
 
 				localPrediction := &Packet{
 					Status: &Status{
@@ -74,7 +68,6 @@ func (node *Node) ProcessMessage(channel chan PacketChannelMessage) {
 		message := <- channel
 		packet := message.Packet
 		senderAddress := message.SenderAddress
-		//n := rand.Intn(100000000)
 
 		if packet.Probe != nil {
 			node.HandleReceivedProbe(packet, *senderAddress)
@@ -87,8 +80,6 @@ func (node *Node) ProcessMessage(channel chan PacketChannelMessage) {
 		} else if packet.StartRound != nil {
 			node.StartRoundHandler <- packet.StartRound.RoundID
 		}
-
-		//fmt.Println("************** FINISHED HANDLING THE RECEIVED MESSAGE ", n, " *****************")
 	}
 }
 
@@ -100,7 +91,6 @@ type IntWrapper struct {
 func (node *Node) HandleIncomingMessages() {
 	counter := &IntWrapper{ v: 0}
 	for {
-		//fmt.Println("waiting for new message ..")
 		// may need to be expanded to support bigger messages..
 		udpBuffer := make([]byte, 64)
 		packet := &Packet{}
@@ -117,10 +107,7 @@ func (node *Node) HandleIncomingMessages() {
 			panic(fmt.Sprintf("error in decoding UDP data: %s\nudpBuffer: %v\nsenderAddress: %s\npacket: %s\nn bytes: %d", err, udpBuffer, senderAddress.String(), packet, n))
 		}
 
-		//fmt.Println("******** new message received: ", packet)
 		node.PacketHandler <- PacketChannelMessage{packet, senderAddress, counter}
-
-		//go node.processMessage(packet, senderAddress, counter)
 	}
 }
 
@@ -129,7 +116,6 @@ func (node *Node) realBroadcast(packet *Packet) {
 }
 
 func RealBroadcast(packet *Packet, connection *net.UDPConn, address *net.UDPAddr) {
-	fmt.Println("sending: ", packet.Probe)
 	packetBytes, err := protobuf.Encode(packet)
 
 	if err != nil {
@@ -174,27 +160,4 @@ func SendToPeer(packet *Packet, peer *net.UDPAddr, connection *net.UDPConn) {
 
 func (node *Node) sendToPeer(packet *Packet, peer Peer) {
 	SendToPeer(packet, peer.PeerAddress, node.Connection)
-}
-
-func (node *Node) opinionVectorDEBUG() {
-	ticker := time.NewTicker(3*time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case _ = <-ticker.C:
-			fmt.Println("Person score: ", node.LocalDecision.scores[1])
-			fmt.Println("Person coefficient: ", node.LocalDecision.boundingBoxCoefficients[1])
-			//fmt.Println("Bottle score: ", node.LocalDecision.scores[44])
-			//fmt.Println("Bottle coefficient: ", node.LocalDecision.boundingBoxCoefficients[44])
-			//fmt.Println("Cell phone score: ", node.LocalDecision.scores[77])
-			//fmt.Println("Cell phone coefficient: ", node.LocalDecision.boundingBoxCoefficients[77])
-			//fmt.Println("Keyboard score: ", node.LocalDecision.scores[76])
-			//fmt.Println("Keyboard coefficient: ", node.LocalDecision.boundingBoxCoefficients[76])
-			fmt.Println("remaining neighbors: ", node.RemainingPeers)
-			fmt.Println("received external predictions: ", node.ExternalPredictions)
-			fmt.Println("current round: ", node.CurrentStatus.StatusValue.CurrentRound, " current status: ", node.CurrentStatus.StatusValue.CurrentState)
-			fmt.Println()
-		}
-	}
 }
