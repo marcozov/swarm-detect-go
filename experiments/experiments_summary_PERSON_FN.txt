@@ -1,0 +1,10 @@
+position 1: np.mean([ 0.07, 0.06] ) --> 0.065
+position 2: np.mean([ 0.18, 0.33 ] ) --> 0.255
+position 3: np.mean( [ 0.91, 0.87] ) --> 0.89
+position 4: np.mean( [ 0.52, 0.64] ) --> 0.58
+position 5: np.mean( [ 0.95, 0.96 ] ) --> 0.955
+
+position 6: np.mean( [ 0.12, 0.08 ] ) --> 0.10
+position 7: np.mean( [ 0.94, 0.94] ) --> 0.94
+position 8: np.mean( [ 0.78, 0.87] ) --> 0.825
+position 9: np.mean( [0.95, 0.97] ) --> 0.96
